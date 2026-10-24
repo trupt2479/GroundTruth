@@ -1,6 +1,19 @@
-"""Service layer placeholders for flight data ingestion, turnaround calculation, and swap heuristics."""
+from app.services.aerodatabox_client import (
+    AeroDataBoxClient,
+    AeroDataBoxError,
+    AeroDataBoxRateLimitError,
+    AeroDataBoxServiceUnavailableError,
+)
+from app.services.cache_service import CacheService
+from app.services.flight_aggregator import FlightAggregator
+from app.services.opensky_client import OpenSkyClient
 
-# Future phases will implement:
-# - FlightAware / AeroDataBox / Flightradar24 ingestion adapters
-# - Turnaround engine calculation service
-# - Hub heuristic & tail-swap probability evaluator
+__all__ = [
+    "AeroDataBoxClient",
+    "AeroDataBoxError",
+    "AeroDataBoxRateLimitError",
+    "AeroDataBoxServiceUnavailableError",
+    "OpenSkyClient",
+    "CacheService",
+    "FlightAggregator",
+]

@@ -1,0 +1,22 @@
+[
+  {
+    "flight_number": "UA210",
+    "origin_iata": "SFO",
+    "destination_iata": "DEN",
+    "scheduled_departure": "2026-10-24T06:00:00Z",
+    "scheduled_arrival": "2026-10-24T09:30:00Z",
+    "actual_departure": "2026-10-24T06:45:00Z",
+    "actual_arrival": "2026-10-24T10:15:00Z",
+    "status": "LANDED"
+  },
+  {
+    "flight_number": "UA584",
+    "origin_iata": "DEN",
+    "destination_iata": "ORD",
+    "scheduled_departure": "2026-10-24T11:00:00Z",
+    "scheduled_arrival": "2026-10-24T14:30:00Z",
+    "actual_departure": "2026-10-24T12:10:00Z",
+    "actual_arrival": "2026-10-24T15:40:00Z",
+    "status": "LANDED"
+  }
+]

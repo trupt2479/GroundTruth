@@ -1,0 +1,9 @@
+{
+  "callsign": "UAL1422 ",
+  "baro_altitude_ft": 28000.0,
+  "ground_speed_kts": 445.5,
+  "on_ground": false,
+  "latitude": 41.8781,
+  "longitude": -87.6298,
+  "last_contact_epoch": 1792842000
+}

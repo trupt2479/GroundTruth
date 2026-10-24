@@ -1,0 +1,63 @@
+{
+  "status": "Delayed",
+  "number": "UA1422",
+  "callsign": "UAL1422",
+  "movement": {
+    "airport": {
+      "icao": "KORD",
+      "iata": "ORD",
+      "name": "Chicago O'Hare International Airport"
+    },
+    "scheduledTime": {
+      "utc": "2026-10-24 18:30Z",
+      "local": "2026-10-24 13:30"
+    },
+    "revisedTime": {
+      "utc": "2026-10-24 19:45Z",
+      "local": "2026-10-24 14:45"
+    },
+    "actualTime": null,
+    "terminal": "1",
+    "gate": "B12"
+  },
+  "departure": {
+    "airport": {
+      "iata": "ORD",
+      "icao": "KORD",
+      "name": "Chicago O'Hare"
+    },
+    "scheduledTime": {
+      "utc": "2026-10-24 18:30Z"
+    },
+    "actualTime": null,
+    "revisedTime": {
+      "utc": "2026-10-24 19:45Z"
+    }
+  },
+  "arrival": {
+    "airport": {
+      "iata": "EWR",
+      "icao": "KEWR",
+      "name": "Newark Liberty International"
+    },
+    "scheduledTime": {
+      "utc": "2026-10-24 21:00Z"
+    },
+    "actualTime": null,
+    "revisedTime": {
+      "utc": "2026-10-24 22:15Z"
+    }
+  },
+  "aircraft": {
+    "reg": "N123UA",
+    "modeS": "A06041",
+    "model": "Boeing 737-800",
+    "icao24": "a06041",
+    "typeCode": "B738"
+  },
+  "airline": {
+    "name": "United Airlines",
+    "iata": "UA",
+    "icao": "UAL"
+  }
+}

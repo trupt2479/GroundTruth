@@ -22,6 +22,17 @@ class Settings(BaseSettings):
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
 
+    @property
+    def REDIS_URL(self) -> str:
+        return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/0"
+
+    # Ingestion Configuration
+    MOCK_INGESTION: bool = True
+    AERODATABOX_API_KEY: str = "mock-rapidapi-key"
+    AERODATABOX_API_HOST: str = "aerodatabox.p.rapidapi.com"
+    AERODATABOX_TIMEOUT: float = 5.0
+    OPENSKY_TIMEOUT: float = 5.0
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
