@@ -162,4 +162,27 @@ describe('GroundRealityCard Component', () => {
     expect(screen.getByText('UA2104')).toBeInTheDocument();
     expect(screen.getByText(/standby recommended/i)).toBeInTheDocument();
   });
+
+  it('renders crew duty limit watchdog banner when timeout risk is HIGH', () => {
+    const mockAssessmentWithCrewTimeout: RealityAssessment = {
+      ...mockAssessmentDelay,
+      crew_duty: {
+        elapsed_duty_minutes: 810,
+        remaining_buffer_minutes: 30,
+        timeout_risk: 'HIGH',
+        risk_summary: 'Critical timeout risk: remaining duty buffer (30m) is under 60 minutes.',
+      },
+    };
+
+    render(<GroundRealityCard assessment={mockAssessmentWithCrewTimeout} />);
+
+    expect(screen.getByTestId('crew-duty-banner')).toBeInTheDocument();
+    expect(
+      screen.getByText(/FAA Part 117 Watchdog: Crew Timeout Warning/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Buffer: 30m/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Inbound delay puts flight crew within/i)
+    ).toBeInTheDocument();
+  });
 });

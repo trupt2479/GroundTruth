@@ -54,6 +54,13 @@ export interface AlternativeFlight {
   standby_recommended: boolean;
 }
 
+export interface CrewDutyAssessment {
+  elapsed_duty_minutes: number;
+  remaining_buffer_minutes: number;
+  timeout_risk: 'LOW' | 'MODERATE' | 'HIGH';
+  risk_summary: string;
+}
+
 export interface RealityAssessment {
   flight_query: FlightQuery;
   official_airline_departure: string;
@@ -64,6 +71,7 @@ export interface RealityAssessment {
   rebooking_directive: 'RELAX_IN_LOUNGE' | 'MONITOR_CLOSELY' | 'EXPEDITE_REBOOKING';
   airspace_advisory?: AirspaceAdvisory | null;
   alternative_flights?: AlternativeFlight[];
+  crew_duty?: CrewDutyAssessment | null;
 }
 
 export interface LiveTelemetry {
