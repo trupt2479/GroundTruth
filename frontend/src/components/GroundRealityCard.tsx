@@ -1,6 +1,17 @@
 import React, { useState } from 'react';
 import { RealityAssessment } from '../types/flight';
-import { Clock, AlertTriangle, ShieldCheck, RefreshCw, Zap, AlertOctagon, Plane, Copy, Check } from 'lucide-react';
+import {
+  Clock,
+  AlertTriangle,
+  ShieldCheck,
+  RefreshCw,
+  Zap,
+  AlertOctagon,
+  Plane,
+  Copy,
+  Check,
+  UserX,
+} from 'lucide-react';
 
 interface GroundRealityCardProps {
   assessment: RealityAssessment;
@@ -17,6 +28,7 @@ export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({ assessment
     rebooking_directive,
     airspace_advisory,
     alternative_flights,
+    crew_duty,
   } = assessment;
 
   const [copiedFlight, setCopiedFlight] = useState<string | null>(null);
@@ -114,6 +126,35 @@ export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({ assessment
             <p className="opacity-90">
               Cause: {airspace_advisory.reason || 'Adverse Airspace Conditions'} • Average Delay:{' '}
               <strong className="font-mono">{airspace_advisory.avg_delay_minutes} min</strong>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Crew Duty Limit Watchdog Alert Banner (FAA Part 117) */}
+      {crew_duty && (crew_duty.timeout_risk === 'HIGH' || crew_duty.timeout_risk === 'MODERATE') && (
+        <div
+          data-testid="crew-duty-banner"
+          className={`border rounded-xl p-3.5 flex items-start gap-3 text-xs ${
+            crew_duty.timeout_risk === 'HIGH'
+              ? 'bg-rose-950/70 border-rose-700/80 text-rose-200'
+              : 'bg-amber-950/60 border-amber-700/80 text-amber-200'
+          }`}
+        >
+          <UserX className="w-5 h-5 flex-shrink-0 mt-0.5 text-rose-400" />
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="font-bold tracking-wide uppercase text-[11px]">
+                FAA Part 117 Watchdog: Crew Timeout Warning
+              </span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/20 border border-rose-500/30 text-rose-300">
+                Buffer: {crew_duty.remaining_buffer_minutes}m
+              </span>
+            </div>
+            <p className="opacity-90">
+              ⚠️ Crew Timeout Warning: Inbound delay puts flight crew within{' '}
+              <strong className="font-mono">{crew_duty.remaining_buffer_minutes}m</strong> of FAA Part 117 legal duty limit
+              (Cancellation Risk High).
             </p>
           </div>
         </div>

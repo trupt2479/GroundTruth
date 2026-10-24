@@ -6,6 +6,7 @@ from app.services.aerodatabox_client import (
     AeroDataBoxServiceUnavailableError,
 )
 from app.services.cache_service import CacheService
+from app.services.crew_duty_watchdog import CrewDutyWatchdog
 from app.services.faa_nas_client import FaaNasClient
 from app.services.flight_aggregator import FlightAggregator
 from app.services.flight_scout import AlternativeFlightScout
@@ -22,6 +23,7 @@ __all__ = [
     "OpenSkyClient",
     "FaaNasClient",
     "AlternativeFlightScout",
+    "CrewDutyWatchdog",
     "CacheService",
     "FlightAggregator",
     "TurnaroundEngine",

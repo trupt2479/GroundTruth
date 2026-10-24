@@ -205,6 +205,29 @@ class AlternativeFlight(BaseModel):
     )
 
 
+class CrewDutyAssessment(BaseModel):
+    """FAA Part 117 flight crew legal duty hours and timeout risk evaluation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    elapsed_duty_minutes: int = Field(
+        ...,
+        description="Estimated elapsed duty minutes since initial crew report time",
+    )
+    remaining_buffer_minutes: int = Field(
+        ...,
+        description="Remaining buffer minutes before reaching the 840-minute (14-hour) FAA Part 117 duty limit",
+    )
+    timeout_risk: Literal["LOW", "MODERATE", "HIGH"] = Field(
+        ...,
+        description="Risk level of flight crew timing out and triggering cancellation",
+    )
+    risk_summary: str = Field(
+        ...,
+        description="Actionable summary of crew duty hours and timeout status",
+    )
+
+
 class RealityAssessment(BaseModel):
     """Final calculated reality assessment contrasting official airline claims against physics."""
 
@@ -247,4 +270,8 @@ class RealityAssessment(BaseModel):
     alternative_flights: List[AlternativeFlight] = Field(
         default_factory=list,
         description="Ranked viable alternative flights if rebooking is expedited",
+    )
+    crew_duty: CrewDutyAssessment | None = Field(
+        default=None,
+        description="FAA Part 117 flight crew duty hours and timeout risk evaluation",
     )

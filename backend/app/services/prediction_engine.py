@@ -4,19 +4,21 @@ from typing import List, Optional
 from app.schemas.flight import (
     AirspaceAdvisory,
     AlternativeFlight,
+    CrewDutyAssessment,
     FlightLeg,
     FlightQuery,
     InboundTurnaround,
     RealityAssessment,
 )
 from app.services.action_engine import ActionEngine
+from app.services.crew_duty_watchdog import CrewDutyWatchdog
 from app.services.flight_scout import AlternativeFlightScout
 from app.services.swap_evaluator import SwapEvaluator
 from app.services.turnaround_engine import TurnaroundEngine
 
 
 class PredictionEngine:
-    """Orchestrates turnaround physics, FAA airspace programs, hub swap evaluation, and prescriptive action directives."""
+    """Orchestrates turnaround physics, FAA airspace programs, crew duty legality, hub swap evaluation, and prescriptive action directives."""
 
     def __init__(
         self,
@@ -24,11 +26,13 @@ class PredictionEngine:
         swap_evaluator: Optional[SwapEvaluator] = None,
         action_engine: Optional[ActionEngine] = None,
         flight_scout: Optional[AlternativeFlightScout] = None,
+        crew_watchdog: Optional[CrewDutyWatchdog] = None,
     ):
         self.turnaround = turnaround_engine or TurnaroundEngine()
         self.swap_evaluator = swap_evaluator or SwapEvaluator()
         self.action = action_engine or ActionEngine()
         self.scout = flight_scout or AlternativeFlightScout()
+        self.crew_watchdog = crew_watchdog or CrewDutyWatchdog()
 
     async def assess_flight_async(
         self,
@@ -38,7 +42,7 @@ class PredictionEngine:
         downstream_connection_layover_minutes: Optional[int] = None,
         airspace_advisory: Optional[AirspaceAdvisory] = None,
     ) -> RealityAssessment:
-        """Asynchronously assesses flight reality and scout alternative flights when rebooking is expedited."""
+        """Asynchronously assesses flight reality, calculates crew duty limits, and scouts alternative flights when rebooking is expedited."""
         assessment = self.assess_flight(
             current_leg=current_leg,
             turnaround=turnaround,
@@ -73,7 +77,7 @@ class PredictionEngine:
         airspace_advisory: Optional[AirspaceAdvisory] = None,
         alternative_flights: Optional[List[AlternativeFlight]] = None,
     ) -> RealityAssessment:
-        """Contrasts official airline schedule against turnaround physics, FAA airspace programs, and spare capacity."""
+        """Contrasts official airline schedule against turnaround physics, FAA airspace programs, crew duty legality, and spare capacity."""
         # 1. Parse or construct flight query if not explicitly passed
         if flight_query is None:
             carrier = current_leg.flight_number[:2].upper()
@@ -123,14 +127,26 @@ class PredictionEngine:
         # 4. Inbound delay magnitude
         inbound_delay_minutes = delay_lead_time_minutes
 
-        # 5. Evaluate tail swap likelihood
+        # 5. Evaluate FAA Part 117 Crew Duty Limits
+        crew_duty = self.crew_watchdog.assess_crew_duty(
+            current_leg=current_leg,
+            previous_legs=turnaround.previous_legs,
+            calculated_earliest_departure=calculated_earliest_departure,
+        )
+
+        crew_timeout_escalation = False
+        if crew_duty.timeout_risk == "HIGH":
+            is_unavoidable_delay = True
+            crew_timeout_escalation = True
+
+        # 6. Evaluate tail swap likelihood
         swap_heuristic = self.swap_evaluator.evaluate_swap(
             origin_iata=current_leg.origin_iata,
             inbound_delay_minutes=inbound_delay_minutes,
         )
 
-        # 6. Determine prescriptive rebooking directive
-        if airspace_escalation:
+        # 7. Determine prescriptive rebooking directive
+        if airspace_escalation or crew_timeout_escalation:
             rebooking_directive = "EXPEDITE_REBOOKING"
         else:
             rebooking_directive = self.action.determine_action(
@@ -140,7 +156,7 @@ class PredictionEngine:
                 downstream_connection_layover_minutes=downstream_connection_layover_minutes,
             )
 
-        # 7. Official airline departure (actual/revised if published, else scheduled)
+        # 8. Official airline departure (actual/revised if published, else scheduled)
         official_airline_departure = (
             current_leg.actual_departure or current_leg.scheduled_departure
         )
@@ -155,4 +171,5 @@ class PredictionEngine:
             rebooking_directive=rebooking_directive,
             airspace_advisory=airspace_advisory,
             alternative_flights=alternative_flights or [],
+            crew_duty=crew_duty,
         )
