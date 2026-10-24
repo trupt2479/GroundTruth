@@ -1,6 +1,6 @@
 import React from 'react';
 import { RealityAssessment } from '../types/flight';
-import { Clock, AlertTriangle, ShieldCheck, RefreshCw, Zap } from 'lucide-react';
+import { Clock, AlertTriangle, ShieldCheck, RefreshCw, Zap, AlertOctagon } from 'lucide-react';
 
 interface GroundRealityCardProps {
   assessment: RealityAssessment;
@@ -15,6 +15,7 @@ export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({ assessment
     is_unavoidable_delay,
     swap_evaluation,
     rebooking_directive,
+    airspace_advisory,
   } = assessment;
 
   // Format datetimes to local display strings
@@ -51,7 +52,7 @@ export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({ assessment
       badge: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
       icon: AlertTriangle,
       headline: 'Immediate Action: Expedite Rebooking',
-      description: 'Unavoidable physical delay at outstation with no spare aircraft. Rebook seats before announcement.',
+      description: 'Unavoidable physical delay or ground stop active. Rebook seats before announcement.',
     },
   }[rebooking_directive];
 
@@ -85,6 +86,29 @@ export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({ assessment
           </div>
         )}
       </div>
+
+      {/* Airspace Advisory Alert Banner (FAA NAS Ground Stop / GDP / Deicing) */}
+      {airspace_advisory && airspace_advisory.advisory_active && (
+        <div
+          data-testid="airspace-advisory-banner"
+          className={`border rounded-xl p-3.5 flex items-start gap-3 text-xs ${
+            airspace_advisory.program_type === 'GROUND_STOP'
+              ? 'bg-rose-950/70 border-rose-700/80 text-rose-200'
+              : 'bg-amber-950/60 border-amber-700/80 text-amber-200'
+          }`}
+        >
+          <AlertOctagon className="w-5 h-5 flex-shrink-0 mt-0.5 text-rose-400" />
+          <div className="space-y-0.5">
+            <span className="font-bold tracking-wide uppercase text-[11px]">
+              FAA Airspace Alert: {airspace_advisory.program_type.replace(/_/g, ' ')} Active at {airspace_advisory.airport_iata}
+            </span>
+            <p className="opacity-90">
+              Cause: {airspace_advisory.reason || 'Adverse Airspace Conditions'} • Average Delay:{' '}
+              <strong className="font-mono">{airspace_advisory.avg_delay_minutes} min</strong>
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Side-by-Side Reality Comparison */}
       <div className="grid grid-cols-2 gap-3">

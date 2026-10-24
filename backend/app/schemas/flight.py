@@ -137,6 +137,35 @@ class SwapHeuristic(BaseModel):
     )
 
 
+class AirspaceAdvisory(BaseModel):
+    """FAA National Airspace System (NAS) status advisory for an airport."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    airport_iata: str = Field(
+        ...,
+        description="Airport 3-letter IATA code",
+    )
+    program_type: Literal[
+        "GROUND_STOP", "GROUND_DELAY_PROGRAM", "DEICING", "NORMAL"
+    ] = Field(
+        ...,
+        description="Type of airspace program / advisory",
+    )
+    reason: str | None = Field(
+        default=None,
+        description="Advisory operational cause (e.g. THUNDERSTORMS, LOW CEILINGS)",
+    )
+    avg_delay_minutes: int = Field(
+        default=0,
+        description="Average delay in minutes caused by the airspace program",
+    )
+    advisory_active: bool = Field(
+        default=False,
+        description="Whether the advisory program is currently active",
+    )
+
+
 class RealityAssessment(BaseModel):
     """Final calculated reality assessment contrasting official airline claims against physics."""
 
@@ -171,4 +200,8 @@ class RealityAssessment(BaseModel):
     ] = Field(
         ...,
         description="Actionable travel guidance directive for traveler",
+    )
+    airspace_advisory: AirspaceAdvisory | None = Field(
+        default=None,
+        description="Correlated FAA airspace advisory for flight origin or inbound stations",
     )

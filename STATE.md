@@ -1,44 +1,43 @@
 # GroundTruth Architecture & State Log
 
 ## Active State
-- **Current Branch**: `poc/phase5-mvp-integration`
+- **Current Branch**: `feat/phase2-faa-airspace-gdp`
 - **Completed Tasks**:
-  - `GT-P0-01` (Foundation, Monorepo Setup & Shared Domain Schemas)
-  - `GT-P1-01` through `GT-P1-04` (Ingestion Adapters, Mock Fixtures, and Redis Cache-Aside)
-  - `GT-P2-01` through `GT-P2-05` (Deterministic Delay, MTT Turnaround, and Equipment Swap Engine)
-  - `GT-P3-01` through `GT-P3-03` (REST Flight Evaluation Endpoints & Server-Sent Events Delivery)
-  - `GT-P4-01` through `GT-P4-04` (Mobile-First React PWA, Ground Reality Card, Tail Visualizer, and SSE Hook)
-  - `GT-P5-01` & `GT-P5-02` (Unified Multi-Container Docker Compose Environment with Nginx Reverse Proxy)
-  - `GT-P5-03` (End-to-End Alpha Integration Test Suite & Latency Benchmarks)
-  - `GT-P5-04` (Repository Documentation & Alpha Sign-Off)
-- **Status**: Completed / Verified (Alpha MVP Ready)
+  - `GT-P0-01` through `GT-P5-04` (Phase 0 Foundation to Phase 5 Alpha MVP Integration)
+  - `GT-ADV-01` (FAA NAS Status & Ground Delay Program Ingestion Engine)
+- **Status**: Completed / Verified
 
-## Monorepo Architecture
-GroundTruth is organized as a production-ready monorepo containing:
-- `backend/`: FastAPI Python application with Pydantic v2 domain schemas, configuration management via `pydantic-settings`, external ingestion clients (`AeroDataBoxClient`, `OpenSkyClient`), caching service (`CacheService`), ingestion aggregator (`FlightAggregator`), math & heuristics engines (`TurnaroundEngine`, `SwapEvaluator`, `ActionEngine`, `PredictionEngine`), REST & SSE endpoints, and comprehensive unit/integration test suites (33 passed).
-- `backend/app/fixtures/`: Realistic mock JSON fixtures enabling rate-limit-free dual-mode replay.
-- `frontend/`: Lightweight, responsive React mobile PWA (TypeScript + Vite + Tailwind CSS) served via multi-stage Docker build with Nginx reverse proxy.
-- `docker-compose.yml`: Multi-container orchestrator running all 4 services:
-  1. `groundtruth-frontend` (Port 3000, Nginx reverse proxy routing `/api/` to backend)
-  2. `groundtruth-backend` (Port 8000, FastAPI app with healthcheck)
-  3. `groundtruth-redis` (Port 6379, in-memory cache)
-  4. `groundtruth-postgres` (Port 5432, PostgreSQL 16 database)
+## Feature GT-ADV-01 Deliverables
 
-## Verified Alpha Test Evidence
-1. **Docker Compose Environment**:
-   - All 4 services running in a healthy state via `docker compose up --build -d`.
-2. **Backend Test Suite (Pytest)**:
-   - 33 out of 33 tests passing cleanly across:
-     - End-to-end integration flows & < 50ms latency benchmarks (`test_e2e_integration.py`)
-     - REST API & Server-Sent Events delivery (`test_api_delivery.py`)
-     - Ingestion clients, dual-mode replay, and cache-aside (`test_ingestion_cache.py`)
-     - Turnaround physics & swap heuristics scenarios (`test_prediction_engine.py`)
-     - Shared domain schemas & health check (`test_schemas.py`)
-3. **Frontend Test Suite & Build (Vitest + Vite)**:
-   - 4 out of 4 component unit tests passing.
-   - Production Vite bundle generated cleanly with zero type errors.
+### 1. FAA NAS Data Client (`backend/app/services/faa_nas_client.py`)
+- Async client querying the FAA NAS status API (`https://nasstatus.faa.gov/api/airport-status-information`) with timeout and rate-limit guardrails.
+- Supports dual-mode execution (`settings.MOCK_INGESTION == True`) reading from local XML fixture `backend/app/fixtures/sample_faa_nas_status.xml`.
+- Implements `get_airport_airspace_status(airport_iata: str)` parsing:
+  - `status_type`: `GROUND_STOP` | `GROUND_DELAY_PROGRAM` | `DEICING` | `NORMAL`
+  - `reason`: e.g. `THUNDERSTORMS`, `LOW CEILINGS`, `SNOW/ICE`
+  - `avg_delay_minutes`: Average delay in minutes
+  - `end_time_utc`: Advisory end timestamp
+  - `advisory_active`: Boolean status
 
-## Phase 2 Roadmap
-- Integration with live FAA Ground Delay Program (GDP) and Ground Stop feeds.
-- Flight crew duty hour and legality limit estimators (FAR Part 117 limits).
-- Push notification & SMS dispatch service (Twilio/Firebase Cloud Messaging).
+### 2. Domain Schema Extension (`backend/app/schemas/flight.py`)
+- Added `AirspaceAdvisory` schema matching FAA operational taxonomy.
+- Extended `RealityAssessment` to include optional `airspace_advisory: Optional[AirspaceAdvisory] = None`.
+
+### 3. Prediction Engine Integration (`backend/app/services/prediction_engine.py`)
+- Evaluates active airspace programs for origin airport:
+  - `GROUND_STOP`: Forces `is_unavoidable_delay = True`, injects ground stop duration, and escalates directive to `EXPEDITE_REBOOKING`.
+  - `GROUND_DELAY_PROGRAM`: Injects average program delay into calculated earliest possible departure if greater than physical turnaround limit.
+
+### 4. Frontend Alert Banner (`frontend/src/components/GroundRealityCard.tsx`)
+- High-visibility airspace alert banner displayed whenever an active `airspace_advisory` is detected on a queried flight.
+- Distinct color grading: Rose/Red for `GROUND_STOP`, Amber/Yellow for `GROUND_DELAY_PROGRAM`.
+
+## Test Verification Summary
+1. **FAA NAS Test Suite (`test_faa_nas.py`)**:
+   - `test_faa_nas_mock_fixture_parsing`: Validates parsing of Ground Stop (ORD), GDP (EWR), and Normal (SFO) entries (PASSED).
+   - `test_prediction_engine_ground_stop_escalation`: Confirms Ground Stop forces `is_unavoidable_delay = True` and `EXPEDITE_REBOOKING` (PASSED).
+   - `test_prediction_engine_ground_delay_program_injection`: Confirms GDP delay injection into earliest departure (PASSED).
+2. **Full Backend Suite (`pytest -v backend/tests`)**:
+   - 36 passed in 33.48s.
+3. **Frontend Vitest Suite (`npm test`)**:
+   - 5 passed in `src/test/components.test.tsx` including active Ground Stop banner rendering.
