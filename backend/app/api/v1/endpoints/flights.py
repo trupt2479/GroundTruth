@@ -4,12 +4,13 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import ValidationError
 
-from app.schemas.flight import FlightQuery, RealityAssessment
+from app.schemas.flight import AirspaceAdvisory, FlightQuery, RealityAssessment
 from app.services.aerodatabox_client import (
     AeroDataBoxError,
     AeroDataBoxRateLimitError,
     AeroDataBoxServiceUnavailableError,
 )
+from app.services.faa_nas_client import FaaNasClient
 from app.services.flight_aggregator import FlightAggregator
 from app.services.prediction_engine import PredictionEngine
 
@@ -26,11 +27,15 @@ def get_prediction_engine() -> PredictionEngine:
     return PredictionEngine()
 
 
+def get_faa_nas_client() -> FaaNasClient:
+    return FaaNasClient()
+
+
 @router.get(
     "/evaluate",
     response_model=RealityAssessment,
     summary="Evaluate Flight Reality",
-    description="Contrasts official airline schedule against inbound aircraft turnaround physics and hub tail-swap probability.",
+    description="Contrasts official airline schedule against inbound aircraft turnaround physics, FAA airspace status, and hub tail-swap probability.",
 )
 async def evaluate_flight(
     carrier: Annotated[
@@ -57,8 +62,9 @@ async def evaluate_flight(
     ],
     aggregator: FlightAggregator = Depends(get_flight_aggregator),
     engine: PredictionEngine = Depends(get_prediction_engine),
+    faa_client: FaaNasClient = Depends(get_faa_nas_client),
 ) -> RealityAssessment:
-    """Validate query, aggregate live context, and produce a RealityAssessment."""
+    """Validate query, aggregate live context, correlate FAA airspace programs, and produce a RealityAssessment."""
     try:
         flight_query = FlightQuery(
             carrier=carrier,
@@ -100,10 +106,26 @@ async def evaluate_flight(
             detail=f"Flight {carrier}{flight_num} on {date_str} not found.",
         )
 
+    # Check FAA NAS airspace advisory for departure airport
+    airspace_advisory: AirspaceAdvisory | None = None
+    try:
+        advisory_data = await faa_client.get_airport_airspace_status(current_leg.origin_iata)
+        if advisory_data and advisory_data.get("advisory_active"):
+            airspace_advisory = AirspaceAdvisory(
+                airport_iata=advisory_data["airport_iata"],
+                program_type=advisory_data["status_type"],
+                reason=advisory_data.get("reason"),
+                avg_delay_minutes=advisory_data.get("avg_delay_minutes", 0),
+                advisory_active=True,
+            )
+    except Exception as exc:
+        logger.warning("Failed to retrieve FAA airspace advisory: %s", exc)
+
     assessment = engine.assess_flight(
         current_leg=current_leg,
         turnaround=turnaround,
         flight_query=flight_query,
+        airspace_advisory=airspace_advisory,
     )
 
     return assessment

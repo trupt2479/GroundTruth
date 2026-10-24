@@ -1,7 +1,8 @@
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional
 
 from app.schemas.flight import (
+    AirspaceAdvisory,
     FlightLeg,
     FlightQuery,
     InboundTurnaround,
@@ -13,7 +14,7 @@ from app.services.turnaround_engine import TurnaroundEngine
 
 
 class PredictionEngine:
-    """Orchestrates turnaround physics, hub swap evaluation, and prescriptive action directives."""
+    """Orchestrates turnaround physics, FAA airspace programs, hub swap evaluation, and prescriptive action directives."""
 
     def __init__(
         self,
@@ -31,8 +32,9 @@ class PredictionEngine:
         turnaround: InboundTurnaround,
         flight_query: Optional[FlightQuery] = None,
         downstream_connection_layover_minutes: Optional[int] = None,
+        airspace_advisory: Optional[AirspaceAdvisory] = None,
     ) -> RealityAssessment:
-        """Contrasts official airline schedule against turnaround physics and spare capacity."""
+        """Contrasts official airline schedule against turnaround physics, FAA airspace programs, and spare capacity."""
         # 1. Parse or construct flight query if not explicitly passed
         if flight_query is None:
             carrier = current_leg.flight_number[:2].upper()
@@ -51,24 +53,55 @@ class PredictionEngine:
             aircraft=turnaround.assigned_aircraft,
         )
 
-        # 3. Inbound delay magnitude
-        inbound_delay_minutes = turnaround_result.delay_lead_time_minutes
+        calculated_earliest_departure = turnaround_result.calculated_earliest_departure
+        delay_lead_time_minutes = turnaround_result.delay_lead_time_minutes
+        is_unavoidable_delay = turnaround_result.is_unavoidable_delay
 
-        # 4. Evaluate tail swap likelihood
+        # 3. Incorporate FAA Airspace Programs (Ground Stops & Ground Delay Programs)
+        airspace_escalation = False
+        if airspace_advisory and airspace_advisory.advisory_active:
+            if airspace_advisory.program_type == "GROUND_STOP":
+                is_unavoidable_delay = True
+                airspace_escalation = True
+                # Inject ground stop delay if lead time is smaller
+                if airspace_advisory.avg_delay_minutes > delay_lead_time_minutes:
+                    delay_lead_time_minutes = airspace_advisory.avg_delay_minutes
+                    calculated_earliest_departure = current_leg.scheduled_departure + timedelta(
+                        minutes=delay_lead_time_minutes
+                    )
+            elif airspace_advisory.program_type == "GROUND_DELAY_PROGRAM":
+                # Inject GDP average delay into earliest departure
+                gdp_earliest = current_leg.scheduled_departure + timedelta(
+                    minutes=airspace_advisory.avg_delay_minutes
+                )
+                if gdp_earliest > calculated_earliest_departure:
+                    calculated_earliest_departure = gdp_earliest
+                    delay_lead_time_minutes = max(
+                        delay_lead_time_minutes, airspace_advisory.avg_delay_minutes
+                    )
+                    is_unavoidable_delay = True
+
+        # 4. Inbound delay magnitude
+        inbound_delay_minutes = delay_lead_time_minutes
+
+        # 5. Evaluate tail swap likelihood
         swap_heuristic = self.swap_evaluator.evaluate_swap(
             origin_iata=current_leg.origin_iata,
             inbound_delay_minutes=inbound_delay_minutes,
         )
 
-        # 5. Determine prescriptive rebooking directive
-        rebooking_directive = self.action.determine_action(
-            is_unavoidable_delay=turnaround_result.is_unavoidable_delay,
-            delay_lead_time_minutes=turnaround_result.delay_lead_time_minutes,
-            swap_heuristic=swap_heuristic,
-            downstream_connection_layover_minutes=downstream_connection_layover_minutes,
-        )
+        # 6. Determine prescriptive rebooking directive
+        if airspace_escalation:
+            rebooking_directive = "EXPEDITE_REBOOKING"
+        else:
+            rebooking_directive = self.action.determine_action(
+                is_unavoidable_delay=is_unavoidable_delay,
+                delay_lead_time_minutes=delay_lead_time_minutes,
+                swap_heuristic=swap_heuristic,
+                downstream_connection_layover_minutes=downstream_connection_layover_minutes,
+            )
 
-        # 6. Official airline departure (actual/revised if published, else scheduled)
+        # 7. Official airline departure (actual/revised if published, else scheduled)
         official_airline_departure = (
             current_leg.actual_departure or current_leg.scheduled_departure
         )
@@ -76,9 +109,10 @@ class PredictionEngine:
         return RealityAssessment(
             flight_query=flight_query,
             official_airline_departure=official_airline_departure,
-            calculated_earliest_departure=turnaround_result.calculated_earliest_departure,
-            delay_lead_time_minutes=turnaround_result.delay_lead_time_minutes,
-            is_unavoidable_delay=turnaround_result.is_unavoidable_delay,
+            calculated_earliest_departure=calculated_earliest_departure,
+            delay_lead_time_minutes=delay_lead_time_minutes,
+            is_unavoidable_delay=is_unavoidable_delay,
             swap_evaluation=swap_heuristic,
             rebooking_directive=rebooking_directive,
+            airspace_advisory=airspace_advisory,
         )

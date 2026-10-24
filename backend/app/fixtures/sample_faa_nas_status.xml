@@ -1,0 +1,23 @@
+<AIRPORT_STATUS_INFORMATION>
+    <Update_Time>2026-10-24T18:00:00Z</Update_Time>
+    <Delay_type>
+        <Ground_Stop>
+            <ARPT>ORD</ARPT>
+            <Reason>THUNDERSTORMS</Reason>
+            <End_Time>2026-10-24T21:00:00Z</End_Time>
+            <Avg_Delay>75</Avg_Delay>
+        </Ground_Stop>
+        <Ground_Delay>
+            <ARPT>EWR</ARPT>
+            <Reason>LOW CEILINGS</Reason>
+            <End_Time>2026-10-24T22:30:00Z</End_Time>
+            <Avg_Delay>45</Avg_Delay>
+        </Ground_Delay>
+        <Deicing>
+            <ARPT>DEN</ARPT>
+            <Reason>SNOW/ICE</Reason>
+            <End_Time>2026-10-24T20:00:00Z</End_Time>
+            <Avg_Delay>25</Avg_Delay>
+        </Deicing>
+    </Delay_type>
+</AIRPORT_STATUS_INFORMATION>

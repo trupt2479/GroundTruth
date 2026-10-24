@@ -1,7 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { FlightSearch } from '../components/FlightSearch';
-
 import { GroundRealityCard } from '../components/GroundRealityCard';
 import { RealityAssessment } from '../types/flight';
 
@@ -104,5 +103,27 @@ describe('GroundRealityCard Component', () => {
     expect(screen.getByText(/on schedule/i)).toBeInTheDocument();
     expect(screen.getByText(/feasible turn/i)).toBeInTheDocument();
     expect(screen.getByText(/relax in lounge/i)).toBeInTheDocument();
+  });
+
+  it('renders active FAA Ground Stop advisory alert banner', () => {
+    const mockAssessmentWithGroundStop: RealityAssessment = {
+      ...mockAssessmentDelay,
+      airspace_advisory: {
+        airport_iata: 'ORD',
+        program_type: 'GROUND_STOP',
+        reason: 'THUNDERSTORMS',
+        avg_delay_minutes: 75,
+        advisory_active: true,
+      },
+    };
+
+    render(<GroundRealityCard assessment={mockAssessmentWithGroundStop} />);
+
+    expect(screen.getByTestId('airspace-advisory-banner')).toBeInTheDocument();
+    expect(
+      screen.getByText(/FAA Airspace Alert: GROUND STOP Active at ORD/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/THUNDERSTORMS/i)).toBeInTheDocument();
+    expect(screen.getByText(/75 min/i)).toBeInTheDocument();
   });
 });

@@ -35,6 +35,14 @@ export interface SwapHeuristic {
   swap_probability: 'HIGH' | 'MODERATE' | 'LOW' | 'NEAR_ZERO';
 }
 
+export interface AirspaceAdvisory {
+  airport_iata: string;
+  program_type: 'GROUND_STOP' | 'GROUND_DELAY_PROGRAM' | 'DEICING' | 'NORMAL';
+  reason?: string | null;
+  avg_delay_minutes: number;
+  advisory_active: boolean;
+}
+
 export interface RealityAssessment {
   flight_query: FlightQuery;
   official_airline_departure: string;
@@ -43,6 +51,7 @@ export interface RealityAssessment {
   is_unavoidable_delay: boolean;
   swap_evaluation: SwapHeuristic;
   rebooking_directive: 'RELAX_IN_LOUNGE' | 'MONITOR_CLOSELY' | 'EXPEDITE_REBOOKING';
+  airspace_advisory?: AirspaceAdvisory | null;
 }
 
 export interface LiveTelemetry {
