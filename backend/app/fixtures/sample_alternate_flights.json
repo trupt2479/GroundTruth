@@ -1,0 +1,32 @@
+[
+  {
+    "flight_number": "UA1588",
+    "carrier": "UA",
+    "departure_time": "2026-10-24T19:30:00Z",
+    "arrival_time": "2026-10-24T22:00:00Z",
+    "origin_iata": "ORD",
+    "destination_iata": "EWR",
+    "seats_available": true,
+    "standby_recommended": false
+  },
+  {
+    "flight_number": "UA2104",
+    "carrier": "UA",
+    "departure_time": "2026-10-24T20:45:00Z",
+    "arrival_time": "2026-10-24T23:15:00Z",
+    "origin_iata": "ORD",
+    "destination_iata": "EWR",
+    "seats_available": false,
+    "standby_recommended": true
+  },
+  {
+    "flight_number": "UA2400",
+    "carrier": "UA",
+    "departure_time": "2026-10-24T22:15:00Z",
+    "arrival_time": "2026-10-25T00:45:00Z",
+    "origin_iata": "ORD",
+    "destination_iata": "EWR",
+    "seats_available": true,
+    "standby_recommended": false
+  }
+]

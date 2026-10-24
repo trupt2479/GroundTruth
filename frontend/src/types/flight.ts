@@ -43,6 +43,17 @@ export interface AirspaceAdvisory {
   advisory_active: boolean;
 }
 
+export interface AlternativeFlight {
+  flight_number: string;
+  carrier: string;
+  departure_time: string;
+  arrival_time: string;
+  origin_iata: string;
+  destination_iata: string;
+  seats_available: boolean;
+  standby_recommended: boolean;
+}
+
 export interface RealityAssessment {
   flight_query: FlightQuery;
   official_airline_departure: string;
@@ -52,6 +63,7 @@ export interface RealityAssessment {
   swap_evaluation: SwapHeuristic;
   rebooking_directive: 'RELAX_IN_LOUNGE' | 'MONITOR_CLOSELY' | 'EXPEDITE_REBOOKING';
   airspace_advisory?: AirspaceAdvisory | null;
+  alternative_flights?: AlternativeFlight[];
 }
 
 export interface LiveTelemetry {

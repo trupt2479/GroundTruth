@@ -64,7 +64,7 @@ async def evaluate_flight(
     engine: PredictionEngine = Depends(get_prediction_engine),
     faa_client: FaaNasClient = Depends(get_faa_nas_client),
 ) -> RealityAssessment:
-    """Validate query, aggregate live context, correlate FAA airspace programs, and produce a RealityAssessment."""
+    """Validate query, aggregate live context, correlate FAA airspace programs, scout alternative flights, and produce a RealityAssessment."""
     try:
         flight_query = FlightQuery(
             carrier=carrier,
@@ -121,7 +121,7 @@ async def evaluate_flight(
     except Exception as exc:
         logger.warning("Failed to retrieve FAA airspace advisory: %s", exc)
 
-    assessment = engine.assess_flight(
+    assessment = await engine.assess_flight_async(
         current_leg=current_leg,
         turnaround=turnaround,
         flight_query=flight_query,

@@ -126,4 +126,40 @@ describe('GroundRealityCard Component', () => {
     expect(screen.getByText(/THUNDERSTORMS/i)).toBeInTheDocument();
     expect(screen.getByText(/75 min/i)).toBeInTheDocument();
   });
+
+  it('renders alternative flights section with seats available and standby badges', () => {
+    const mockAssessmentWithAlternatives: RealityAssessment = {
+      ...mockAssessmentDelay,
+      alternative_flights: [
+        {
+          flight_number: 'UA1588',
+          carrier: 'UA',
+          departure_time: '2026-10-24T19:30:00Z',
+          arrival_time: '2026-10-24T22:00:00Z',
+          origin_iata: 'ORD',
+          destination_iata: 'EWR',
+          seats_available: true,
+          standby_recommended: false,
+        },
+        {
+          flight_number: 'UA2104',
+          carrier: 'UA',
+          departure_time: '2026-10-24T20:45:00Z',
+          arrival_time: '2026-10-24T23:15:00Z',
+          origin_iata: 'ORD',
+          destination_iata: 'EWR',
+          seats_available: false,
+          standby_recommended: true,
+        },
+      ],
+    };
+
+    render(<GroundRealityCard assessment={mockAssessmentWithAlternatives} />);
+
+    expect(screen.getByTestId('alternative-flights-section')).toBeInTheDocument();
+    expect(screen.getByText('UA1588')).toBeInTheDocument();
+    expect(screen.getByText(/seats available/i)).toBeInTheDocument();
+    expect(screen.getByText('UA2104')).toBeInTheDocument();
+    expect(screen.getByText(/standby recommended/i)).toBeInTheDocument();
+  });
 });

@@ -166,6 +166,45 @@ class AirspaceAdvisory(BaseModel):
     )
 
 
+class AlternativeFlight(BaseModel):
+    """Viable alternative flight option for travelers facing severe delays."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    flight_number: str = Field(
+        ...,
+        description="Flight number of alternative flight (e.g. UA1588)",
+    )
+    carrier: str = Field(
+        ...,
+        description="Carrier code (e.g. UA)",
+    )
+    departure_time: datetime = Field(
+        ...,
+        description="Scheduled departure timestamp of alternative flight",
+    )
+    arrival_time: datetime = Field(
+        ...,
+        description="Scheduled arrival timestamp of alternative flight",
+    )
+    origin_iata: str = Field(
+        ...,
+        description="Origin airport IATA code",
+    )
+    destination_iata: str = Field(
+        ...,
+        description="Destination airport IATA code",
+    )
+    seats_available: bool = Field(
+        default=True,
+        description="Whether confirmed seats are available",
+    )
+    standby_recommended: bool = Field(
+        default=False,
+        description="Whether standby status is recommended if seats are sold out",
+    )
+
+
 class RealityAssessment(BaseModel):
     """Final calculated reality assessment contrasting official airline claims against physics."""
 
@@ -204,4 +243,8 @@ class RealityAssessment(BaseModel):
     airspace_advisory: AirspaceAdvisory | None = Field(
         default=None,
         description="Correlated FAA airspace advisory for flight origin or inbound stations",
+    )
+    alternative_flights: List[AlternativeFlight] = Field(
+        default_factory=list,
+        description="Ranked viable alternative flights if rebooking is expedited",
     )
