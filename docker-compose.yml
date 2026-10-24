@@ -1,4 +1,23 @@
 services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: groundtruth-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+
   backend:
     build:
       context: ./backend
@@ -14,6 +33,7 @@ services:
       - POSTGRES_DB=groundtruth
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - MOCK_INGESTION=true
     depends_on:
       postgres:
         condition: service_healthy
