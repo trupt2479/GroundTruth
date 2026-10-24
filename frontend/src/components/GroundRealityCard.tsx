@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { RealityAssessment } from '../types/flight';
-import { Clock, AlertTriangle, ShieldCheck, RefreshCw, Zap, AlertOctagon } from 'lucide-react';
+import { Clock, AlertTriangle, ShieldCheck, RefreshCw, Zap, AlertOctagon, Plane, Copy, Check } from 'lucide-react';
 
 interface GroundRealityCardProps {
   assessment: RealityAssessment;
@@ -16,7 +16,16 @@ export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({ assessment
     swap_evaluation,
     rebooking_directive,
     airspace_advisory,
+    alternative_flights,
   } = assessment;
+
+  const [copiedFlight, setCopiedFlight] = useState<string | null>(null);
+
+  const handleCopy = (flightNum: string) => {
+    navigator.clipboard?.writeText(flightNum);
+    setCopiedFlight(flightNum);
+    setTimeout(() => setCopiedFlight(null), 2000);
+  };
 
   // Format datetimes to local display strings
   const formatTime = (isoString: string) => {
@@ -171,6 +180,64 @@ export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({ assessment
           <p className="text-xs leading-relaxed opacity-90">{directiveConfig.description}</p>
         </div>
       </div>
+
+      {/* Alternative Flights Section (when rebooking is recommended/expedited) */}
+      {alternative_flights && alternative_flights.length > 0 && (
+        <div data-testid="alternative-flights-section" className="space-y-3 pt-2 border-t border-slate-800">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <Plane className="w-3.5 h-3.5 text-blue-400" />
+              <span>Recommended Alternative Flights</span>
+            </span>
+            <span className="text-[10px] text-slate-500 font-mono">Ranked by Departure</span>
+          </div>
+
+          <div className="space-y-2">
+            {alternative_flights.map((alt) => (
+              <div
+                key={alt.flight_number}
+                className="bg-slate-950/70 border border-slate-800/90 rounded-xl p-3 flex items-center justify-between text-xs"
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-black text-sm text-white">{alt.flight_number}</span>
+                    <span className="text-slate-400 text-[11px]">
+                      {alt.origin_iata} → {alt.destination_iata}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 font-mono">
+                    Dep: {formatTime(alt.departure_time)} • Arr: {formatTime(alt.arrival_time)}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {alt.seats_available ? (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      Seats Available
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      Standby Recommended
+                    </span>
+                  )}
+
+                  <button
+                    onClick={() => handleCopy(alt.flight_number)}
+                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                    title="Copy flight number"
+                  >
+                    {copiedFlight === alt.flight_number ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

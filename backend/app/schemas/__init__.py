@@ -1,6 +1,7 @@
 from app.schemas.flight import (
     AircraftInfo,
     AirspaceAdvisory,
+    AlternativeFlight,
     FlightLeg,
     FlightQuery,
     InboundTurnaround,
@@ -11,6 +12,7 @@ from app.schemas.flight import (
 __all__ = [
     "AircraftInfo",
     "AirspaceAdvisory",
+    "AlternativeFlight",
     "FlightLeg",
     "FlightQuery",
     "InboundTurnaround",

@@ -1,14 +1,16 @@
 from datetime import date, timedelta
-from typing import Optional
+from typing import List, Optional
 
 from app.schemas.flight import (
     AirspaceAdvisory,
+    AlternativeFlight,
     FlightLeg,
     FlightQuery,
     InboundTurnaround,
     RealityAssessment,
 )
 from app.services.action_engine import ActionEngine
+from app.services.flight_scout import AlternativeFlightScout
 from app.services.swap_evaluator import SwapEvaluator
 from app.services.turnaround_engine import TurnaroundEngine
 
@@ -21,10 +23,46 @@ class PredictionEngine:
         turnaround_engine: Optional[TurnaroundEngine] = None,
         swap_evaluator: Optional[SwapEvaluator] = None,
         action_engine: Optional[ActionEngine] = None,
+        flight_scout: Optional[AlternativeFlightScout] = None,
     ):
         self.turnaround = turnaround_engine or TurnaroundEngine()
         self.swap_evaluator = swap_evaluator or SwapEvaluator()
         self.action = action_engine or ActionEngine()
+        self.scout = flight_scout or AlternativeFlightScout()
+
+    async def assess_flight_async(
+        self,
+        current_leg: FlightLeg,
+        turnaround: InboundTurnaround,
+        flight_query: Optional[FlightQuery] = None,
+        downstream_connection_layover_minutes: Optional[int] = None,
+        airspace_advisory: Optional[AirspaceAdvisory] = None,
+    ) -> RealityAssessment:
+        """Asynchronously assesses flight reality and scout alternative flights when rebooking is expedited."""
+        assessment = self.assess_flight(
+            current_leg=current_leg,
+            turnaround=turnaround,
+            flight_query=flight_query,
+            downstream_connection_layover_minutes=downstream_connection_layover_minutes,
+            airspace_advisory=airspace_advisory,
+        )
+
+        # Trigger flight scout when directive is EXPEDITE_REBOOKING
+        if assessment.rebooking_directive == "EXPEDITE_REBOOKING":
+            carrier = assessment.flight_query.carrier
+            origin = current_leg.origin_iata
+            dest = current_leg.destination_iata
+            after_time = current_leg.scheduled_departure
+
+            alternatives = await self.scout.find_alternative_flights(
+                carrier=carrier,
+                origin_iata=origin,
+                destination_iata=dest,
+                after_time=after_time,
+            )
+            assessment.alternative_flights = alternatives
+
+        return assessment
 
     def assess_flight(
         self,
@@ -33,6 +71,7 @@ class PredictionEngine:
         flight_query: Optional[FlightQuery] = None,
         downstream_connection_layover_minutes: Optional[int] = None,
         airspace_advisory: Optional[AirspaceAdvisory] = None,
+        alternative_flights: Optional[List[AlternativeFlight]] = None,
     ) -> RealityAssessment:
         """Contrasts official airline schedule against turnaround physics, FAA airspace programs, and spare capacity."""
         # 1. Parse or construct flight query if not explicitly passed
@@ -115,4 +154,5 @@ class PredictionEngine:
             swap_evaluation=swap_heuristic,
             rebooking_directive=rebooking_directive,
             airspace_advisory=airspace_advisory,
+            alternative_flights=alternative_flights or [],
         )
