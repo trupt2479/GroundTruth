@@ -33,7 +33,17 @@ services:
       - POSTGRES_DB=groundtruth
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - MOCK_INGESTION=true
+      - MOCK_INGESTION=${MOCK_INGESTION:-true}
+      - AERODATABOX_API_KEY=${AERODATABOX_API_KEY:-}
+      - AERODATABOX_API_HOST=${AERODATABOX_API_HOST:-aerodatabox.p.rapidapi.com}
+      - OPENSKY_CLIENT_ID=${OPENSKY_CLIENT_ID:-}
+      - OPENSKY_CLIENT_SECRET=${OPENSKY_CLIENT_SECRET:-}
+      - OPENSKY_USERNAME=${OPENSKY_USERNAME:-}
+      - OPENSKY_PASSWORD=${OPENSKY_PASSWORD:-}
+      - FAA_NAS_API_URL=${FAA_NAS_API_URL:-https://nasstatus.faa.gov/api/airport-status-information}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
+      - TWILIO_PHONE_NUMBER=${TWILIO_PHONE_NUMBER:-}
     depends_on:
       postgres:
         condition: service_healthy
