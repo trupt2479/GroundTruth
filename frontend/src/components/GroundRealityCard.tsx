@@ -11,7 +11,9 @@ import {
   Copy,
   Check,
   UserX,
+  Bell,
 } from 'lucide-react';
+import { NotificationModal } from './NotificationModal';
 
 interface GroundRealityCardProps {
   assessment: RealityAssessment;
@@ -32,6 +34,7 @@ export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({ assessment
   } = assessment;
 
   const [copiedFlight, setCopiedFlight] = useState<string | null>(null);
+  const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
 
   const handleCopy = (flightNum: string) => {
     navigator.clipboard?.writeText(flightNum);
@@ -107,6 +110,16 @@ export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({ assessment
           </div>
         )}
       </div>
+
+      {/* Proactive Push Alert Trigger Button */}
+      <button
+        type="button"
+        onClick={() => setIsAlertModalOpen(true)}
+        className="w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-indigo-600/15 hover:bg-indigo-600/25 text-indigo-300 border border-indigo-500/30 transition shadow-sm cursor-pointer"
+      >
+        <Bell className="w-4 h-4 text-indigo-400" />
+        <span>Get Real-Time Alerts</span>
+      </button>
 
       {/* Airspace Advisory Alert Banner (FAA NAS Ground Stop / GDP / Deicing) */}
       {airspace_advisory && airspace_advisory.advisory_active && (
@@ -279,6 +292,13 @@ export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({ assessment
           </div>
         </div>
       )}
+
+      {/* Proactive Notification Modal */}
+      <NotificationModal
+        isOpen={isAlertModalOpen}
+        onClose={() => setIsAlertModalOpen(false)}
+        flightQuery={flight_query}
+      />
     </div>
   );
 };

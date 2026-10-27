@@ -83,3 +83,20 @@ export interface LiveTelemetry {
   longitude?: number;
   last_contact_epoch?: number;
 }
+
+export interface NotificationSubscription {
+  flight_carrier: string;
+  flight_number: string;
+  flight_date: string;
+  recipient_type: 'SMS' | 'WEBHOOK';
+  destination: string;
+  alert_on_delay?: boolean;
+  alert_on_crew_timeout?: boolean;
+  alert_on_swap?: boolean;
+}
+
+export interface NotificationResponse {
+  status: string;
+  message: string;
+  subscription: NotificationSubscription;
+}

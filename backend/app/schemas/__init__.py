@@ -9,6 +9,10 @@ from app.schemas.flight import (
     RealityAssessment,
     SwapHeuristic,
 )
+from app.schemas.notification import (
+    NotificationResponse,
+    NotificationSubscription,
+)
 
 __all__ = [
     "AircraftInfo",
@@ -20,4 +24,6 @@ __all__ = [
     "InboundTurnaround",
     "RealityAssessment",
     "SwapHeuristic",
+    "NotificationSubscription",
+    "NotificationResponse",
 ]

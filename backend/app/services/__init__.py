@@ -10,6 +10,7 @@ from app.services.crew_duty_watchdog import CrewDutyWatchdog
 from app.services.faa_nas_client import FaaNasClient
 from app.services.flight_aggregator import FlightAggregator
 from app.services.flight_scout import AlternativeFlightScout
+from app.services.notification_service import NotificationService
 from app.services.opensky_client import OpenSkyClient
 from app.services.prediction_engine import PredictionEngine
 from app.services.swap_evaluator import SwapEvaluator
@@ -24,6 +25,7 @@ __all__ = [
     "FaaNasClient",
     "AlternativeFlightScout",
     "CrewDutyWatchdog",
+    "NotificationService",
     "CacheService",
     "FlightAggregator",
     "TurnaroundEngine",
