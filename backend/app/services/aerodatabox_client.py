@@ -56,6 +56,47 @@ class AeroDataBoxClient:
             mock_mode if mock_mode is not None else settings.MOCK_INGESTION
         )
         self.base_url = f"https://{self.api_host}"
+        logger.info(
+            "AeroDataBoxClient initialized (mock_mode=%s, host=%s)",
+            self.mock_mode,
+            self.api_host,
+        )
+
+    def _load_fixture(
+        self, filename: str, target_date: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Load local mock fixture and adapt dates to the requested target_date."""
+        fixture_path = FIXTURES_DIR / filename
+        if not fixture_path.exists():
+            raise FileNotFoundError(f"Fixture not found at {fixture_path}")
+        with open(fixture_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        if target_date:
+            # Dynamically replace sample date 2026-10-24 with target_date
+            content = content.replace("2026-10-24", target_date)
+
+        data = json.loads(content)
+        if isinstance(data, list):
+            return data[0] if data else {}
+        return data
+
+    def _load_rotations_fixture(
+        self, filename: str, target_date: Optional[str] = None
+    ) -> List[FlightLeg]:
+        """Load local rotation fixtures and adapt timestamps to target_date."""
+        fixture_path = FIXTURES_DIR / filename
+        if not fixture_path.exists():
+            raise FileNotFoundError(f"Fixture not found at {fixture_path}")
+        with open(fixture_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        if target_date:
+            content = content.replace("2026-10-24", target_date)
+
+        items = json.loads(content)
+        legs = [FlightLeg.model_validate(item) for item in items]
+        return legs[-2:]
 
     async def get_flight_status(
         self, carrier: str, flight_num: str, date: str
@@ -65,22 +106,25 @@ class AeroDataBoxClient:
         Endpoint: GET /flights/number/{carrier}{flight_num}/{date}
         """
         if self.mock_mode:
-            logger.info("AeroDataBoxClient: Returning mock flight status payload")
-            fixture_path = FIXTURES_DIR / "sample_aerodatabox_flight.json"
-            if not fixture_path.exists():
-                raise FileNotFoundError(f"Fixture not found at {fixture_path}")
-            with open(fixture_path, "r", encoding="utf-8") as f:
-                return json.load(f)
+            logger.info(
+                "AeroDataBoxClient: [MOCK REPLAY] Loading local fixture for %s%s on %s",
+                carrier,
+                flight_num,
+                date,
+            )
+            return self._load_fixture("sample_aerodatabox_flight.json", date)
 
         url = f"{self.base_url}/flights/number/{carrier}{flight_num}/{date}"
         headers = {
             "X-RapidAPI-Key": self.api_key,
             "X-RapidAPI-Host": self.api_host,
         }
+        logger.info("AeroDataBoxClient: [LIVE INGESTION] Dispatching outbound request to %s", url)
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             try:
                 response = await client.get(url, headers=headers)
+                logger.info("AeroDataBoxClient: [LIVE INGESTION] Response received with status %s", response.status_code)
                 if response.status_code == 429:
                     raise AeroDataBoxRateLimitError(
                         "Rate limit exceeded (HTTP 429) for AeroDataBox API."
@@ -108,24 +152,24 @@ class AeroDataBoxClient:
     ) -> List[FlightLeg]:
         """Fetch up to 2 preceding legs for the assigned aircraft tail."""
         if self.mock_mode:
-            logger.info("AeroDataBoxClient: Returning mock inbound rotations")
-            fixture_path = FIXTURES_DIR / "sample_aerodatabox_rotations.json"
-            if not fixture_path.exists():
-                raise FileNotFoundError(f"Fixture not found at {fixture_path}")
-            with open(fixture_path, "r", encoding="utf-8") as f:
-                items = json.load(f)
-            legs = [FlightLeg.model_validate(item) for item in items]
-            return legs[-2:]
+            logger.info(
+                "AeroDataBoxClient: [MOCK REPLAY] Loading local rotation fixture for tail %s on %s",
+                tail_number,
+                date,
+            )
+            return self._load_rotations_fixture("sample_aerodatabox_rotations.json", date)
 
         url = f"{self.base_url}/flights/reg/{tail_number}/{date}"
         headers = {
             "X-RapidAPI-Key": self.api_key,
             "X-RapidAPI-Host": self.api_host,
         }
+        logger.info("AeroDataBoxClient: [LIVE INGESTION] Dispatching outbound rotation request to %s", url)
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             try:
                 response = await client.get(url, headers=headers)
+                logger.info("AeroDataBoxClient: [LIVE INGESTION] Rotation response received with status %s", response.status_code)
                 if response.status_code == 429:
                     raise AeroDataBoxRateLimitError("Rate limit exceeded (HTTP 429)")
                 if response.status_code == 503:
