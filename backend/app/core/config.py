@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     AERODATABOX_TIMEOUT: float = 5.0
     OPENSKY_TIMEOUT: float = 5.0
 
+    # Live Transponder Feeds (OpenSky Network - Optional Authenticated Access)
+    OPENSKY_CLIENT_ID: Optional[str] = None
+    OPENSKY_CLIENT_SECRET: Optional[str] = None
+
+    # FAA NAS Status Service (Airspace & Ground Stops)
+    FAA_NAS_API_URL: str = "https://nasstatus.faa.gov/api/airport-status-information"
+
     # Twilio / Push Notifications (Optional)
     TWILIO_ACCOUNT_SID: Optional[str] = None
     TWILIO_AUTH_TOKEN: Optional[str] = None

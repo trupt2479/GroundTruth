@@ -56,6 +56,11 @@ class AeroDataBoxClient:
             mock_mode if mock_mode is not None else settings.MOCK_INGESTION
         )
         self.base_url = f"https://{self.api_host}"
+        logger.info(
+            "AeroDataBoxClient initialized (mock_mode=%s, host=%s)",
+            self.mock_mode,
+            self.api_host,
+        )
 
     async def get_flight_status(
         self, carrier: str, flight_num: str, date: str
@@ -65,7 +70,12 @@ class AeroDataBoxClient:
         Endpoint: GET /flights/number/{carrier}{flight_num}/{date}
         """
         if self.mock_mode:
-            logger.info("AeroDataBoxClient: Returning mock flight status payload")
+            logger.info(
+                "AeroDataBoxClient: [MOCK REPLAY] Loading local fixture for %s%s on %s",
+                carrier,
+                flight_num,
+                date,
+            )
             fixture_path = FIXTURES_DIR / "sample_aerodatabox_flight.json"
             if not fixture_path.exists():
                 raise FileNotFoundError(f"Fixture not found at {fixture_path}")
@@ -77,10 +87,12 @@ class AeroDataBoxClient:
             "X-RapidAPI-Key": self.api_key,
             "X-RapidAPI-Host": self.api_host,
         }
+        logger.info("AeroDataBoxClient: [LIVE INGESTION] Dispatching outbound request to %s", url)
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             try:
                 response = await client.get(url, headers=headers)
+                logger.info("AeroDataBoxClient: [LIVE INGESTION] Response received with status %s", response.status_code)
                 if response.status_code == 429:
                     raise AeroDataBoxRateLimitError(
                         "Rate limit exceeded (HTTP 429) for AeroDataBox API."
@@ -108,7 +120,10 @@ class AeroDataBoxClient:
     ) -> List[FlightLeg]:
         """Fetch up to 2 preceding legs for the assigned aircraft tail."""
         if self.mock_mode:
-            logger.info("AeroDataBoxClient: Returning mock inbound rotations")
+            logger.info(
+                "AeroDataBoxClient: [MOCK REPLAY] Loading local rotation fixture for tail %s",
+                tail_number,
+            )
             fixture_path = FIXTURES_DIR / "sample_aerodatabox_rotations.json"
             if not fixture_path.exists():
                 raise FileNotFoundError(f"Fixture not found at {fixture_path}")
@@ -122,10 +137,12 @@ class AeroDataBoxClient:
             "X-RapidAPI-Key": self.api_key,
             "X-RapidAPI-Host": self.api_host,
         }
+        logger.info("AeroDataBoxClient: [LIVE INGESTION] Dispatching outbound rotation request to %s", url)
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             try:
                 response = await client.get(url, headers=headers)
+                logger.info("AeroDataBoxClient: [LIVE INGESTION] Rotation response received with status %s", response.status_code)
                 if response.status_code == 429:
                     raise AeroDataBoxRateLimitError("Rate limit exceeded (HTTP 429)")
                 if response.status_code == 503:

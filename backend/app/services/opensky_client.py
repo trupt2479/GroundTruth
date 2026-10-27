@@ -24,6 +24,7 @@ class OpenSkyClient:
             mock_mode if mock_mode is not None else settings.MOCK_INGESTION
         )
         self.base_url = "https://opensky-network.org/api/states/all"
+        logger.info("OpenSkyClient initialized (mock_mode=%s)", self.mock_mode)
 
     async def get_aircraft_state(
         self, icao24_or_callsign: str
@@ -33,7 +34,10 @@ class OpenSkyClient:
         callsign, baro_altitude_ft, ground_speed_kts, on_ground, latitude, longitude, last_contact_epoch
         """
         if self.mock_mode:
-            logger.info("OpenSkyClient: Returning mock live telemetry state")
+            logger.info(
+                "OpenSkyClient: [MOCK REPLAY] Loading local telemetry fixture for %s",
+                icao24_or_callsign,
+            )
             fixture_path = FIXTURES_DIR / "sample_opensky_state.json"
             if not fixture_path.exists():
                 raise FileNotFoundError(f"Fixture not found at {fixture_path}")
@@ -45,9 +49,19 @@ class OpenSkyClient:
         if len(target) == 6 and all(c in "0123456789abcdef" for c in target):
             params["icao24"] = target
 
+        logger.info(
+            "OpenSkyClient: [LIVE INGESTION] Dispatching outbound request to %s for target %s",
+            self.base_url,
+            target,
+        )
+
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             try:
                 response = await client.get(self.base_url, params=params)
+                logger.info(
+                    "OpenSkyClient: [LIVE INGESTION] Response received with status %s",
+                    response.status_code,
+                )
                 if response.status_code != 200:
                     logger.warning("OpenSky API returned HTTP %s", response.status_code)
                     return None

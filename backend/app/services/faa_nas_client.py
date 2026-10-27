@@ -16,15 +16,16 @@ class FaaNasClient:
 
     def __init__(
         self,
-        base_url: str = "https://nasstatus.faa.gov/api/airport-status-information",
+        base_url: Optional[str] = None,
         timeout: float = 5.0,
         mock_mode: Optional[bool] = None,
     ):
-        self.base_url = base_url
+        self.base_url = base_url or settings.FAA_NAS_API_URL
         self.timeout = timeout
         self.mock_mode = (
             mock_mode if mock_mode is not None else settings.MOCK_INGESTION
         )
+        logger.info("FaaNasClient initialized (mock_mode=%s)", self.mock_mode)
 
     def _parse_xml_status(self, xml_text: str, airport_iata: str) -> Optional[Dict[str, Any]]:
         """Parse FAA NAS XML payload and extract status for the requested airport."""
@@ -122,7 +123,7 @@ class FaaNasClient:
         - advisory_active: bool
         """
         if self.mock_mode:
-            logger.info("FaaNasClient: Returning mock FAA NAS status fixture")
+            logger.info("FaaNasClient: [MOCK REPLAY] Returning mock FAA NAS status fixture")
             fixture_path = FIXTURES_DIR / "sample_faa_nas_status.xml"
             if not fixture_path.exists():
                 raise FileNotFoundError(f"Fixture not found at {fixture_path}")
@@ -130,9 +131,11 @@ class FaaNasClient:
                 xml_text = f.read()
             return self._parse_xml_status(xml_text, airport_iata)
 
+        logger.info("FaaNasClient: [LIVE INGESTION] Requesting FAA NAS status from %s", self.base_url)
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             try:
                 response = await client.get(self.base_url)
+                logger.info("FaaNasClient: [LIVE INGESTION] Response received with status %s", response.status_code)
                 if response.status_code != 200:
                     logger.warning("FAA NAS API returned status %s", response.status_code)
                     return None
