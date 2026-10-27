@@ -62,6 +62,42 @@ class AeroDataBoxClient:
             self.api_host,
         )
 
+    def _load_fixture(
+        self, filename: str, target_date: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Load local mock fixture and adapt dates to the requested target_date."""
+        fixture_path = FIXTURES_DIR / filename
+        if not fixture_path.exists():
+            raise FileNotFoundError(f"Fixture not found at {fixture_path}")
+        with open(fixture_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        if target_date:
+            # Dynamically replace sample date 2026-10-24 with target_date
+            content = content.replace("2026-10-24", target_date)
+
+        data = json.loads(content)
+        if isinstance(data, list):
+            return data[0] if data else {}
+        return data
+
+    def _load_rotations_fixture(
+        self, filename: str, target_date: Optional[str] = None
+    ) -> List[FlightLeg]:
+        """Load local rotation fixtures and adapt timestamps to target_date."""
+        fixture_path = FIXTURES_DIR / filename
+        if not fixture_path.exists():
+            raise FileNotFoundError(f"Fixture not found at {fixture_path}")
+        with open(fixture_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        if target_date:
+            content = content.replace("2026-10-24", target_date)
+
+        items = json.loads(content)
+        legs = [FlightLeg.model_validate(item) for item in items]
+        return legs[-2:]
+
     async def get_flight_status(
         self, carrier: str, flight_num: str, date: str
     ) -> Dict[str, Any]:
@@ -76,11 +112,7 @@ class AeroDataBoxClient:
                 flight_num,
                 date,
             )
-            fixture_path = FIXTURES_DIR / "sample_aerodatabox_flight.json"
-            if not fixture_path.exists():
-                raise FileNotFoundError(f"Fixture not found at {fixture_path}")
-            with open(fixture_path, "r", encoding="utf-8") as f:
-                return json.load(f)
+            return self._load_fixture("sample_aerodatabox_flight.json", date)
 
         url = f"{self.base_url}/flights/number/{carrier}{flight_num}/{date}"
         headers = {
@@ -121,16 +153,11 @@ class AeroDataBoxClient:
         """Fetch up to 2 preceding legs for the assigned aircraft tail."""
         if self.mock_mode:
             logger.info(
-                "AeroDataBoxClient: [MOCK REPLAY] Loading local rotation fixture for tail %s",
+                "AeroDataBoxClient: [MOCK REPLAY] Loading local rotation fixture for tail %s on %s",
                 tail_number,
+                date,
             )
-            fixture_path = FIXTURES_DIR / "sample_aerodatabox_rotations.json"
-            if not fixture_path.exists():
-                raise FileNotFoundError(f"Fixture not found at {fixture_path}")
-            with open(fixture_path, "r", encoding="utf-8") as f:
-                items = json.load(f)
-            legs = [FlightLeg.model_validate(item) for item in items]
-            return legs[-2:]
+            return self._load_rotations_fixture("sample_aerodatabox_rotations.json", date)
 
         url = f"{self.base_url}/flights/reg/{tail_number}/{date}"
         headers = {

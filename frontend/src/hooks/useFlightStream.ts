@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { RealityAssessment } from '../types/flight';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const MAX_RECONNECT_ATTEMPTS = 5;
+const BASE_BACKOFF_MS = 2000;
+const MAX_BACKOFF_MS = 15000;
 
 interface UseFlightStreamResult {
   assessment: RealityAssessment | null;
@@ -77,12 +80,24 @@ export function useFlightStream(
       eventSourceRef.current = null;
       setIsConnected(false);
 
-      // Reconnect with exponential backoff (max 30s)
       reconnectAttemptsRef.current += 1;
-      setIsReconnecting(true);
-      const backoffMs = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000);
 
-      setError(`Connection lost. Reconnecting in ${(backoffMs / 1000).toFixed(0)}s...`);
+      if (reconnectAttemptsRef.current > MAX_RECONNECT_ATTEMPTS) {
+        setIsReconnecting(false);
+        setError('Stream disconnected. Maximum reconnection attempts reached. Please refresh.');
+        return;
+      }
+
+      setIsReconnecting(true);
+      // Exponential backoff: 2s, 4s, 8s, up to 15s max
+      const backoffMs = Math.min(
+        BASE_BACKOFF_MS * Math.pow(2, reconnectAttemptsRef.current - 1),
+        MAX_BACKOFF_MS
+      );
+
+      setError(
+        `Connection lost. Reconnecting in ${(backoffMs / 1000).toFixed(0)}s (attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})...`
+      );
 
       reconnectTimeoutRef.current = setTimeout(() => {
         connect();
