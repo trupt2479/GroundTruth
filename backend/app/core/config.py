@@ -1,5 +1,6 @@
 import logging
 import sys
+from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -32,6 +33,11 @@ class Settings(BaseSettings):
     AERODATABOX_API_HOST: str = "aerodatabox.p.rapidapi.com"
     AERODATABOX_TIMEOUT: float = 5.0
     OPENSKY_TIMEOUT: float = 5.0
+
+    # Twilio / Push Notifications (Optional)
+    TWILIO_ACCOUNT_SID: Optional[str] = None
+    TWILIO_AUTH_TOKEN: Optional[str] = None
+    TWILIO_PHONE_NUMBER: Optional[str] = None
 
     model_config = SettingsConfigDict(
         env_file=".env",

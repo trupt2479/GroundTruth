@@ -185,4 +185,50 @@ describe('GroundRealityCard Component', () => {
       screen.getByText(/Inbound delay puts flight crew within/i)
     ).toBeInTheDocument();
   });
+
+  it('opens notification modal and handles SMS alert submission', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        status: 'success',
+        message: 'Successfully subscribed +15551234567 to alerts for UA1422 on 2026-10-24.',
+        subscription: {
+          flight_carrier: 'UA',
+          flight_number: '1422',
+          flight_date: '2026-10-24',
+          recipient_type: 'SMS',
+          destination: '+15551234567',
+        },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<GroundRealityCard assessment={mockAssessmentDelay} />);
+
+    // Click "Get Real-Time Alerts"
+    const alertBtn = screen.getByRole('button', { name: /get real-time alerts/i });
+    fireEvent.click(alertBtn);
+
+    // Modal should be visible
+    expect(screen.getByText(/proactive alert dispatch/i)).toBeInTheDocument();
+
+    // Try submit without destination -> client validation error
+    const submitBtn = screen.getByRole('button', { name: /activate alerts/i });
+    fireEvent.click(submitBtn);
+    expect(screen.getByText(/please enter a destination address/i)).toBeInTheDocument();
+
+    // Enter invalid phone
+    const destInput = screen.getByLabelText(/mobile phone number/i);
+    fireEvent.change(destInput, { target: { value: '123' } });
+    fireEvent.click(submitBtn);
+    expect(screen.getByText(/valid e\.164 phone number/i)).toBeInTheDocument();
+
+    // Enter valid phone
+    fireEvent.change(destInput, { target: { value: '+15551234567' } });
+    fireEvent.click(submitBtn);
+
+    expect(await screen.findByText(/successfully subscribed \+15551234567/i)).toBeInTheDocument();
+
+    vi.unstubAllGlobals();
+  });
 });
