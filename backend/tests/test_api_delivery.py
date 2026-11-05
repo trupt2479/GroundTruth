@@ -1,6 +1,6 @@
 import asyncio
 from datetime import date
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
 import httpx
 import pytest
@@ -193,3 +193,62 @@ async def test_sse_stream_initial_event_and_heartbeat():
     assert "event: INITIAL" in events[0]
     assert "data: {" in events[0]
     assert "event: TICK" in events[1] or ": keep-alive" in events[1] or "event: UPDATE" in events[1]
+
+
+@pytest.mark.asyncio
+async def test_aerodatabox_live_no_fallback_on_404():
+    """GT-LIVE-02: Ensure live mode never falls back to mock fixtures on 404."""
+    from app.services.aerodatabox_client import AeroDataBoxClient
+    client = AeroDataBoxClient(mock_mode=False, api_key="dummy_key", api_host="dummy_host")
+
+    mock_resp = AsyncMock()
+    mock_resp.status_code = 404
+
+    with patch("httpx.AsyncClient.get", return_value=mock_resp):
+        with patch.object(client, "_load_fixture") as mock_load_fix:
+            res = await client.get_flight_status("DL", "565", "2026-11-04")
+            assert res == {}
+            mock_load_fix.assert_not_called()
+
+        with patch.object(client, "_load_rotations_fixture") as mock_load_rot:
+            rotations = await client.get_inbound_rotations("N824DN", "2026-11-04")
+            assert rotations == []
+            mock_load_rot.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_opensky_live_no_vector_returns_inactive_state():
+    """GT-LIVE-02: Ensure live OpenSky returns inactive on-ground state when no airborne vector exists."""
+    from app.services.opensky_client import OpenSkyClient
+    client = OpenSkyClient(mock_mode=False)
+
+    mock_resp = AsyncMock()
+    mock_resp.status_code = 200
+    mock_resp.json = MagicMock(return_value={"states": []})
+
+    with patch("httpx.AsyncClient.get", return_value=mock_resp):
+        state = await client.get_aircraft_state("accd69")
+        assert state is not None
+        assert state["on_ground"] is True
+        assert state["baro_altitude_ft"] is None
+        assert state["ground_speed_kts"] is None
+
+
+def test_evaluate_flight_exposes_route_and_milestones(client):
+    """GT-LIVE-02: Verify evaluate_flight exposes route and milestone fields."""
+    response = client.get(
+        "/api/v1/flights/evaluate",
+        params={
+            "carrier": "UA",
+            "flight_num": "1422",
+            "date": "2026-10-24",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["origin_iata"] == "ORD"
+    assert data["destination_iata"] == "EWR"
+    assert data["origin_name"] is not None
+    assert data["destination_name"] is not None
+    assert "scheduled_departure" in data
+    assert "inbound_turnaround" in data

@@ -204,6 +204,10 @@ def test_reality_assessment_roundtrip_serialization():
 
     assessment = RealityAssessment(
         flight_query=query,
+        origin_iata="ORD",
+        destination_iata="EWR",
+        origin_name="Chicago O'Hare International",
+        destination_name="Newark Liberty International",
         official_airline_departure=official_dep,
         calculated_earliest_departure=calculated_dep,
         delay_lead_time_minutes=75,

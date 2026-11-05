@@ -63,6 +63,14 @@ export interface CrewDutyAssessment {
 
 export interface RealityAssessment {
   flight_query: FlightQuery;
+  origin_iata: string;
+  destination_iata: string;
+  origin_name?: string | null;
+  destination_name?: string | null;
+  scheduled_departure?: string | null;
+  actual_or_estimated_departure?: string | null;
+  scheduled_arrival?: string | null;
+  actual_or_estimated_arrival?: string | null;
   official_airline_departure: string;
   calculated_earliest_departure: string;
   delay_lead_time_minutes: number;
@@ -72,6 +80,8 @@ export interface RealityAssessment {
   airspace_advisory?: AirspaceAdvisory | null;
   alternative_flights?: AlternativeFlight[];
   crew_duty?: CrewDutyAssessment | null;
+  inbound_turnaround?: InboundTurnaround | null;
+  live_telemetry?: LiveTelemetry | null;
 }
 
 export interface LiveTelemetry {

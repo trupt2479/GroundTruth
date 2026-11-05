@@ -22,6 +22,14 @@ interface GroundRealityCardProps {
 export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({ assessment }) => {
   const {
     flight_query,
+    origin_iata,
+    destination_iata,
+    origin_name,
+    destination_name,
+    scheduled_departure,
+    actual_or_estimated_departure,
+    scheduled_arrival,
+    actual_or_estimated_arrival,
     official_airline_departure,
     calculated_earliest_departure,
     delay_lead_time_minutes,
@@ -88,10 +96,22 @@ export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({ assessment
       <div className="flex items-center justify-between border-b border-slate-800 pb-4">
         <div>
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Target Flight</span>
-          <h3 className="text-2xl font-black text-white tracking-tight">
-            {flight_query.carrier} {flight_query.flight_number}
+          <h3 className="text-2xl font-black text-white tracking-tight flex items-center gap-2 flex-wrap">
+            <span>{flight_query.carrier} {flight_query.flight_number}</span>
+            {origin_iata && destination_iata && (
+              <span className="text-xl font-bold text-slate-300 font-mono">
+                • {origin_iata} → {destination_iata}
+              </span>
+            )}
           </h3>
-          <span className="text-xs font-mono text-slate-400">{flight_query.departure_date}</span>
+          <div className="flex items-center gap-2 text-xs font-mono text-slate-400 mt-0.5">
+            <span>{flight_query.departure_date}</span>
+            {origin_name && destination_name && (
+              <span className="text-[11px] text-slate-500 font-sans hidden sm:inline">
+                ({origin_name} to {destination_name})
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Lead Time Badge */}
@@ -109,6 +129,52 @@ export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({ assessment
             <span>On Schedule</span>
           </div>
         )}
+      </div>
+
+      {/* Flight Milestones Sub-Card */}
+      <div data-testid="flight-milestones-subcard" className="bg-slate-950/60 border border-slate-800 rounded-xl p-3.5 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+            <Clock className="w-3 h-3 text-blue-400" />
+            <span>Flight Milestones</span>
+          </span>
+          <span className="text-[10px] font-mono text-slate-500">
+            {origin_iata} → {destination_iata}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-3 text-xs pt-1">
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-lg p-2.5 space-y-1">
+            <span className="text-[10px] text-slate-400 uppercase font-semibold block">Departure Milestones</span>
+            <div className="font-mono text-xs flex justify-between">
+              <span className="text-slate-500">Sched:</span>
+              <span className="text-slate-200 font-semibold">
+                {scheduled_departure ? formatTime(scheduled_departure) : officialTimeFormatted}
+              </span>
+            </div>
+            <div className="font-mono text-xs flex justify-between">
+              <span className="text-slate-500">Runway Out:</span>
+              <span className="text-slate-200 font-semibold">
+                {actual_or_estimated_departure ? formatTime(actual_or_estimated_departure) : 'On Schedule'}
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-lg p-2.5 space-y-1">
+            <span className="text-[10px] text-slate-400 uppercase font-semibold block">Arrival Milestones</span>
+            <div className="font-mono text-xs flex justify-between">
+              <span className="text-slate-500">Sched:</span>
+              <span className="text-slate-200 font-semibold">
+                {scheduled_arrival ? formatTime(scheduled_arrival) : 'Scheduled'}
+              </span>
+            </div>
+            <div className="font-mono text-xs flex justify-between">
+              <span className="text-slate-500">Touchdown:</span>
+              <span className="text-slate-200 font-semibold">
+                {actual_or_estimated_arrival ? formatTime(actual_or_estimated_arrival) : 'Estimated On-Time'}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Proactive Push Alert Trigger Button */}

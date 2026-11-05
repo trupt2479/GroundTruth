@@ -41,6 +41,7 @@ class PredictionEngine:
         flight_query: Optional[FlightQuery] = None,
         downstream_connection_layover_minutes: Optional[int] = None,
         airspace_advisory: Optional[AirspaceAdvisory] = None,
+        live_telemetry: Optional[dict] = None,
     ) -> RealityAssessment:
         """Asynchronously assesses flight reality, calculates crew duty limits, and scouts alternative flights when rebooking is expedited."""
         assessment = self.assess_flight(
@@ -49,6 +50,7 @@ class PredictionEngine:
             flight_query=flight_query,
             downstream_connection_layover_minutes=downstream_connection_layover_minutes,
             airspace_advisory=airspace_advisory,
+            live_telemetry=live_telemetry,
         )
 
         # Trigger flight scout when directive is EXPEDITE_REBOOKING
@@ -76,6 +78,7 @@ class PredictionEngine:
         downstream_connection_layover_minutes: Optional[int] = None,
         airspace_advisory: Optional[AirspaceAdvisory] = None,
         alternative_flights: Optional[List[AlternativeFlight]] = None,
+        live_telemetry: Optional[dict] = None,
     ) -> RealityAssessment:
         """Contrasts official airline schedule against turnaround physics, FAA airspace programs, crew duty legality, and spare capacity."""
         # 1. Parse or construct flight query if not explicitly passed
@@ -163,6 +166,14 @@ class PredictionEngine:
 
         return RealityAssessment(
             flight_query=flight_query,
+            origin_iata=current_leg.origin_iata,
+            destination_iata=current_leg.destination_iata,
+            origin_name=current_leg.origin_name,
+            destination_name=current_leg.destination_name,
+            scheduled_departure=current_leg.scheduled_departure,
+            actual_or_estimated_departure=current_leg.actual_departure,
+            scheduled_arrival=current_leg.scheduled_arrival,
+            actual_or_estimated_arrival=current_leg.actual_arrival,
             official_airline_departure=official_airline_departure,
             calculated_earliest_departure=calculated_earliest_departure,
             delay_lead_time_minutes=delay_lead_time_minutes,
@@ -172,4 +183,6 @@ class PredictionEngine:
             airspace_advisory=airspace_advisory,
             alternative_flights=alternative_flights or [],
             crew_duty=crew_duty,
+            inbound_turnaround=turnaround,
+            live_telemetry=live_telemetry,
         )
