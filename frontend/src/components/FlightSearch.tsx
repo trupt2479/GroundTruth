@@ -1,6 +1,38 @@
 import React, { useState } from 'react';
 import { Search, Plane } from 'lucide-react';
 
+export interface QuickScenario {
+  id: string;
+  name: string;
+  carrier: string;
+  flightNumber: string;
+  description: string;
+}
+
+export const QUICK_SCENARIOS: QuickScenario[] = [
+  {
+    id: 'scenario-1',
+    name: 'Scenario 1: UA 1422',
+    carrier: 'UA',
+    flightNumber: '1422',
+    description: 'ORD Ground Stop + High Crew Timeout Risk',
+  },
+  {
+    id: 'scenario-2',
+    name: 'Scenario 2: DL 450',
+    carrier: 'DL',
+    flightNumber: '450',
+    description: 'Hub Spare Available / Low Risk Turnaround',
+  },
+  {
+    id: 'scenario-3',
+    name: 'Scenario 3: AA 1200',
+    carrier: 'AA',
+    flightNumber: '1200',
+    description: 'Outstation Inbound Delay Trap',
+  },
+];
+
 interface FlightSearchProps {
   onSearch: (carrier: string, flightNumber: string, date: string) => void;
   isLoading: boolean;
@@ -96,6 +128,49 @@ export const FlightSearch: React.FC<FlightSearchProps> = ({ onSearch, isLoading 
               className="w-full bg-slate-950 border border-slate-750 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl px-3 py-2.5 text-center font-sans text-sm font-medium text-slate-200 outline-none transition"
               disabled={isLoading}
             />
+          </div>
+        </div>
+
+        {/* Quick Scenarios Demonstration Selector */}
+        <div className="space-y-1.5 pt-1" data-testid="quick-scenarios-container">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              Quick Scenarios
+            </span>
+            <span className="text-[10px] text-slate-500 font-medium">1-click demo</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {QUICK_SCENARIOS.map((s) => {
+              const isSelected = carrier === s.carrier && flightNumber === s.flightNumber;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  data-testid={`scenario-btn-${s.carrier}-${s.flightNumber}`}
+                  onClick={() => {
+                    setCarrier(s.carrier);
+                    setFlightNumber(s.flightNumber);
+                    setDepartureDate(today);
+                    setValidationError(null);
+                  }}
+                  className={`p-2 rounded-xl text-left border transition text-xs flex flex-col justify-center cursor-pointer ${
+                    isSelected
+                      ? 'bg-blue-950/70 border-blue-500 text-blue-200 shadow-sm shadow-blue-500/20'
+                      : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 text-slate-300'
+                  }`}
+                >
+                  <span className="font-bold text-slate-100 font-mono text-xs flex items-center justify-between">
+                    {s.carrier} {s.flightNumber}
+                    {isSelected && (
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                    )}
+                  </span>
+                  <span className="text-[10px] text-slate-400 leading-tight mt-0.5 line-clamp-2">
+                    {s.description}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
