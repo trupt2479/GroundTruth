@@ -65,6 +65,40 @@ describe('FlightSearch Component', () => {
 
     expect(onSearchMock).toHaveBeenCalledWith('AA', '1200', expect.any(String));
   });
+
+  it('updates date to Today and Tomorrow when preset buttons are clicked', () => {
+    const onSearchMock = vi.fn();
+    render(<FlightSearch onSearch={onSearchMock} isLoading={false} />);
+
+    const dateInput = screen.getByLabelText(/date/i) as HTMLInputElement;
+    const todayBtn = screen.getByTestId('preset-today-btn');
+    const tomorrowBtn = screen.getByTestId('preset-tomorrow-btn');
+
+    const expectedToday = new Date().toISOString().split('T')[0];
+    const tomorrowDate = new Date();
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    const expectedTomorrow = tomorrowDate.toISOString().split('T')[0];
+
+    // Click Tomorrow
+    fireEvent.click(tomorrowBtn);
+    expect(dateInput.value).toBe(expectedTomorrow);
+
+    // Click Today
+    fireEvent.click(todayBtn);
+    expect(dateInput.value).toBe(expectedToday);
+  });
+
+  it('triggers showPicker on date input click if supported', () => {
+    const onSearchMock = vi.fn();
+    render(<FlightSearch onSearch={onSearchMock} isLoading={false} />);
+
+    const dateInput = screen.getByLabelText(/date/i) as HTMLInputElement;
+    const showPickerSpy = vi.fn();
+    dateInput.showPicker = showPickerSpy;
+
+    fireEvent.click(dateInput);
+    expect(showPickerSpy).toHaveBeenCalled();
+  });
 });
 
 describe('useFlightStream Hook Zero-Auto-Retry', () => {

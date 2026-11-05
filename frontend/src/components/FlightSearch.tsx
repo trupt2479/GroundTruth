@@ -39,7 +39,15 @@ interface FlightSearchProps {
 }
 
 export const FlightSearch: React.FC<FlightSearchProps> = ({ onSearch, isLoading }) => {
-  const today = new Date().toISOString().split('T')[0];
+  const getTodayISO = () => new Date().toISOString().split('T')[0];
+  const getTomorrowISO = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  };
+
+  const today = getTodayISO();
+  const tomorrow = getTomorrowISO();
 
   const [carrier, setCarrier] = useState('UA');
   const [flightNumber, setFlightNumber] = useState('1422');
@@ -51,6 +59,7 @@ export const FlightSearch: React.FC<FlightSearchProps> = ({ onSearch, isLoading 
 
     const cleanCarrier = carrier.trim().toUpperCase();
     const cleanFlightNum = flightNumber.trim();
+    const cleanDate = departureDate.trim();
 
     // Client-side regex validations
     if (!/^[A-Z]{2}$/.test(cleanCarrier)) {
@@ -63,13 +72,13 @@ export const FlightSearch: React.FC<FlightSearchProps> = ({ onSearch, isLoading 
       return;
     }
 
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(departureDate)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) {
       setValidationError('Date must be in YYYY-MM-DD format.');
       return;
     }
 
     setValidationError(null);
-    onSearch(cleanCarrier, cleanFlightNum, departureDate);
+    onSearch(cleanCarrier, cleanFlightNum, cleanDate);
   };
 
   return (
@@ -115,19 +124,56 @@ export const FlightSearch: React.FC<FlightSearchProps> = ({ onSearch, isLoading 
             />
           </div>
 
-          {/* Departure Date Input */}
+          {/* Departure Date Input & Quick Presets */}
           <div className="col-span-2 sm:col-span-1">
-            <label htmlFor="date-input" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
-              Date
-            </label>
-            <input
-              id="date-input"
-              type="date"
-              value={departureDate}
-              onChange={(e) => setDepartureDate(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-750 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl px-3 py-2.5 text-center font-sans text-sm font-medium text-slate-200 outline-none transition"
-              disabled={isLoading}
-            />
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="date-input" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                Date
+              </label>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  data-testid="preset-today-btn"
+                  onClick={() => {
+                    setDepartureDate(getTodayISO());
+                    setValidationError(null);
+                  }}
+                  className={`text-[10px] font-semibold px-2 py-0.5 rounded transition cursor-pointer border ${
+                    departureDate === today
+                      ? 'bg-blue-600 border-blue-500 text-white shadow-sm'
+                      : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                  }`}
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  data-testid="preset-tomorrow-btn"
+                  onClick={() => {
+                    setDepartureDate(getTomorrowISO());
+                    setValidationError(null);
+                  }}
+                  className={`text-[10px] font-semibold px-2 py-0.5 rounded transition cursor-pointer border ${
+                    departureDate === tomorrow
+                      ? 'bg-blue-600 border-blue-500 text-white shadow-sm'
+                      : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                  }`}
+                >
+                  Tomorrow
+                </button>
+              </div>
+            </div>
+            <div className="relative">
+              <input
+                id="date-input"
+                type="date"
+                value={departureDate}
+                onChange={(e) => setDepartureDate(e.target.value)}
+                onClick={(e) => e.currentTarget.showPicker?.()}
+                className="w-full bg-slate-950 border border-slate-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl px-3 py-2.5 text-center font-sans text-sm font-medium text-slate-200 outline-none transition cursor-pointer"
+                disabled={isLoading}
+              />
+            </div>
           </div>
         </div>
 
@@ -150,7 +196,7 @@ export const FlightSearch: React.FC<FlightSearchProps> = ({ onSearch, isLoading 
                   onClick={() => {
                     setCarrier(s.carrier);
                     setFlightNumber(s.flightNumber);
-                    setDepartureDate(today);
+                    setDepartureDate(getTodayISO());
                     setValidationError(null);
                   }}
                   className={`p-2 rounded-xl text-left border transition text-xs flex flex-col justify-center cursor-pointer ${
