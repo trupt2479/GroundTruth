@@ -126,6 +126,7 @@ async def evaluate_flight(
         turnaround=turnaround,
         flight_query=flight_query,
         airspace_advisory=airspace_advisory,
+        live_telemetry=telemetry,
     )
 
     return assessment

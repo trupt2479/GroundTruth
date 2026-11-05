@@ -53,6 +53,10 @@ def sample_reality_assessment():
     )
     return RealityAssessment(
         flight_query=flight_query,
+        origin_iata="ORD",
+        destination_iata="EWR",
+        origin_name="Chicago O'Hare International",
+        destination_name="Newark Liberty International",
         official_airline_departure=sched_dep,
         calculated_earliest_departure=sched_dep + timedelta(minutes=45),
         delay_lead_time_minutes=45,

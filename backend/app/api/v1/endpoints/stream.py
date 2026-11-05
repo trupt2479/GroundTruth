@@ -51,6 +51,7 @@ async def flight_event_generator(
             current_leg=current_leg,
             turnaround=turnaround,
             flight_query=flight_query,
+            live_telemetry=telemetry,
         )
         initial_payload = assessment.model_dump(mode="json")
         last_assessment_json = json.dumps(initial_payload, sort_keys=True)
@@ -82,6 +83,7 @@ async def flight_event_generator(
                     current_leg=current_leg,
                     turnaround=turnaround,
                     flight_query=flight_query,
+                    live_telemetry=telemetry,
                 )
                 current_payload = assessment.model_dump(mode="json")
                 current_json = json.dumps(current_payload, sort_keys=True)
