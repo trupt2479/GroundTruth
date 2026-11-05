@@ -45,6 +45,18 @@ export const formatLocalDate = (d: Date = new Date()): string => {
   return `${year}-${month}-${day}`;
 };
 
+export const getTimeZoneAbbr = (): string => {
+  try {
+    return (
+      new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' })
+        .formatToParts(new Date())
+        .find((p) => p.type === 'timeZoneName')?.value || 'local'
+    );
+  } catch {
+    return 'local';
+  }
+};
+
 export const FlightSearch: React.FC<FlightSearchProps> = ({ onSearch, isLoading }) => {
   const getToday = () => formatLocalDate(new Date());
   const getTomorrow = () => {
@@ -135,7 +147,7 @@ export const FlightSearch: React.FC<FlightSearchProps> = ({ onSearch, isLoading 
           <div className="col-span-2 sm:col-span-1">
             <div className="flex items-center justify-between mb-1">
               <label htmlFor="date-input" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                Date
+                Date <span className="text-[10px] text-slate-500 font-mono font-normal lowercase">({getTimeZoneAbbr()})</span>
               </label>
               <div className="flex items-center gap-1">
                 <button
