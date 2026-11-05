@@ -124,42 +124,7 @@ export const App: React.FC = () => {
             <GroundRealityCard assessment={displayAssessment} />
             {/* Live Inbound Visualizer */}
             <InboundVisualizer
-              turnaround={{
-                previous_legs: [
-                  {
-                    flight_number: 'UA210',
-                    origin_iata: 'SFO',
-                    destination_iata: 'DEN',
-                    scheduled_departure: '2026-10-24T06:00:00Z',
-                    scheduled_arrival: '2026-10-24T09:30:00Z',
-                    actual_arrival: '2026-10-24T10:15:00Z',
-                    status: 'LANDED',
-                  },
-                  {
-                    flight_number: 'UA584',
-                    origin_iata: 'DEN',
-                    destination_iata: 'ORD',
-                    scheduled_departure: '2026-10-24T11:00:00Z',
-                    scheduled_arrival: '2026-10-24T14:30:00Z',
-                    actual_arrival: '2026-10-24T15:40:00Z',
-                    status: 'LANDED',
-                  },
-                ],
-                assigned_aircraft: {
-                  icao_type: 'B738',
-                  tail_number: 'N123UA',
-                  category: 'NARROWBODY',
-                },
-                mtt_minutes: 45,
-                estimated_touchdown: '2026-10-24T15:40:00Z',
-                earliest_possible_departure: '2026-10-24T16:25:00Z',
-              }}
-              liveTelemetry={{
-                callsign: `${displayAssessment.flight_query.carrier}${displayAssessment.flight_query.flight_number}`,
-                baro_altitude_ft: 28000,
-                ground_speed_kts: 445,
-                on_ground: false,
-              }}
+              assessment={displayAssessment}
             />
           </div>
         )}

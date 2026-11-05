@@ -2,6 +2,7 @@ import { render, screen, fireEvent, renderHook, act } from '@testing-library/rea
 import { describe, it, expect, vi } from 'vitest';
 import { FlightSearch, formatLocalDate } from '../components/FlightSearch';
 import { GroundRealityCard } from '../components/GroundRealityCard';
+import { InboundVisualizer } from '../components/InboundVisualizer';
 import { useFlightStream, MAX_RECONNECT_ATTEMPTS } from '../hooks/useFlightStream';
 import { RealityAssessment } from '../types/flight';
 
@@ -146,6 +147,14 @@ describe('GroundRealityCard Component', () => {
       flight_number: '1422',
       departure_date: '2026-10-24',
     },
+    origin_iata: 'ORD',
+    destination_iata: 'EWR',
+    origin_name: "Chicago O'Hare",
+    destination_name: 'Newark Liberty',
+    scheduled_departure: '2026-10-24T18:30:00Z',
+    actual_or_estimated_departure: '2026-10-24T19:45:00Z',
+    scheduled_arrival: '2026-10-24T21:00:00Z',
+    actual_or_estimated_arrival: '2026-10-24T22:15:00Z',
     official_airline_departure: '2026-10-24T18:30:00Z',
     calculated_earliest_departure: '2026-10-24T19:15:00Z',
     delay_lead_time_minutes: 45,
@@ -161,8 +170,10 @@ describe('GroundRealityCard Component', () => {
   it('renders unavoidable delay, lead time delta, and rebooking directive', () => {
     render(<GroundRealityCard assessment={mockAssessmentDelay} />);
 
-    // Assert Flight Title
+    // Assert Flight Title and Route
     expect(screen.getByText('UA 1422')).toBeInTheDocument();
+    expect(screen.getAllByText(/ORD → EWR/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByTestId('flight-milestones-subcard')).toBeInTheDocument();
 
     // Assert Early Warning Lead Time Delta badge (+45 min ahead)
     expect(screen.getByText(/\+45 min ahead/i)).toBeInTheDocument();
@@ -186,6 +197,14 @@ describe('GroundRealityCard Component', () => {
         flight_number: '450',
         departure_date: '2026-10-24',
       },
+      origin_iata: 'ATL',
+      destination_iata: 'MCO',
+      origin_name: 'Atlanta Hartsfield-Jackson',
+      destination_name: 'Orlando International',
+      scheduled_departure: '2026-10-24T12:00:00Z',
+      actual_or_estimated_departure: '2026-10-24T12:00:00Z',
+      scheduled_arrival: '2026-10-24T13:30:00Z',
+      actual_or_estimated_arrival: '2026-10-24T13:30:00Z',
       official_airline_departure: '2026-10-24T12:00:00Z',
       calculated_earliest_departure: '2026-10-24T11:45:00Z',
       delay_lead_time_minutes: 0,
@@ -331,5 +350,85 @@ describe('GroundRealityCard Component', () => {
     expect(await screen.findByText(/successfully subscribed \+15551234567/i)).toBeInTheDocument();
 
     vi.unstubAllGlobals();
+  });
+});
+
+describe('InboundVisualizer Component Live Transparency', () => {
+  it('renders clean notice when previous_legs is empty', () => {
+    const emptyTurnaround = {
+      previous_legs: [],
+      assigned_aircraft: {
+        icao_type: 'B738',
+        tail_number: 'N824DN',
+        category: 'NARROWBODY' as const,
+      },
+      mtt_minutes: 45 as const,
+      estimated_touchdown: '2026-11-04T18:00:00Z',
+      earliest_possible_departure: '2026-11-04T18:45:00Z',
+    };
+
+    render(<InboundVisualizer turnaround={emptyTurnaround} liveTelemetry={null} />);
+
+    expect(screen.getByTestId('no-rotations-notice')).toBeInTheDocument();
+    expect(
+      screen.getByText(/No upstream rotation legs reported by carrier dispatch. Operating on direct turnaround buffer./i)
+    ).toBeInTheDocument();
+    expect(screen.queryByText('UA210')).not.toBeInTheDocument();
+    expect(screen.queryByText('UA584')).not.toBeInTheDocument();
+  });
+
+  it('renders inactive telemetry banner when aircraft is on ground or transponder dormant', () => {
+    const turnaround = {
+      previous_legs: [],
+      assigned_aircraft: {
+        icao_type: 'A321',
+        tail_number: 'N450DL',
+        category: 'NARROWBODY' as const,
+      },
+      mtt_minutes: 45 as const,
+      estimated_touchdown: '2026-11-04T14:00:00Z',
+      earliest_possible_departure: '2026-11-04T14:45:00Z',
+    };
+
+    const inactiveTelemetry = {
+      callsign: 'DAL450',
+      on_ground: true,
+      baro_altitude_ft: null,
+      ground_speed_kts: null,
+    };
+
+    render(<InboundVisualizer turnaround={turnaround} liveTelemetry={inactiveTelemetry} />);
+
+    expect(screen.getByTestId('live-telemetry-inactive')).toBeInTheDocument();
+    expect(screen.getByText(/Telemetry: On Ground \/ Inactive/i)).toBeInTheDocument();
+    expect(screen.queryByText(/28,000 ft/i)).not.toBeInTheDocument();
+  });
+
+  it('renders active airborne stats when transponder is airborne with altitude', () => {
+    const turnaround = {
+      previous_legs: [],
+      assigned_aircraft: {
+        icao_type: 'B738',
+        tail_number: 'N123UA',
+        category: 'NARROWBODY' as const,
+      },
+      mtt_minutes: 45 as const,
+      estimated_touchdown: '2026-11-04T18:00:00Z',
+      earliest_possible_departure: '2026-11-04T18:45:00Z',
+    };
+
+    const activeTelemetry = {
+      callsign: 'UAL1422',
+      on_ground: false,
+      baro_altitude_ft: 31000,
+      ground_speed_kts: 460,
+    };
+
+    render(<InboundVisualizer turnaround={turnaround} liveTelemetry={activeTelemetry} />);
+
+    expect(screen.getByTestId('live-telemetry-active')).toBeInTheDocument();
+    expect(screen.getByText('Airborne')).toBeInTheDocument();
+    expect(screen.getByText('31,000 ft')).toBeInTheDocument();
+    expect(screen.getByText('460 kts')).toBeInTheDocument();
   });
 });

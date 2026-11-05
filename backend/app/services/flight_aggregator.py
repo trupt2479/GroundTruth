@@ -75,7 +75,7 @@ class FlightAggregator:
 
     async def get_flight_context(
         self, query: FlightQuery
-    ) -> Tuple[FlightLeg, InboundTurnaround, Optional[Dict[str, Any]]]:
+    ) -> Tuple[Optional[FlightLeg], Optional[InboundTurnaround], Optional[Dict[str, Any]]]:
         """Aggregate current flight leg, inbound turnaround, and live transponder telemetry.
 
         Uses cache-aside pattern with Redis (TTL = 120s for aggregate).
@@ -100,6 +100,10 @@ class FlightAggregator:
             date=str(query.departure_date),
         )
 
+        if not flight_raw and not self.aerodatabox.mock_mode:
+            logger.warning("Flight %s%s on %s returned empty data in live mode", query.carrier, query.flight_number, query.departure_date)
+            return None, None, None
+
         dep_info = flight_raw.get("departure") or {}
         arr_info = flight_raw.get("arrival") or {}
         movement = flight_raw.get("movement") or {}
@@ -111,34 +115,54 @@ class FlightAggregator:
         origin_iata = (
             dep_airport.get("iata")
             or movement_airport.get("iata")
-            or "ORD"
+            or ("ORD" if self.aerodatabox.mock_mode else None)
+        )
+        origin_name = (
+            dep_airport.get("name")
+            or movement_airport.get("name")
         )
         destination_iata = (
             arr_airport.get("iata")
-            or "EWR"
+            or ("EWR" if self.aerodatabox.mock_mode else None)
         )
+        destination_name = arr_airport.get("name")
+
+        if not origin_iata or not destination_iata:
+            if not self.aerodatabox.mock_mode:
+                logger.warning("Missing origin or destination IATA for %s%s", query.carrier, query.flight_number)
+                return None, None, None
+            origin_iata = origin_iata or "ORD"
+            destination_iata = destination_iata or "EWR"
 
         sched_dep_str = (
             _safe_get_utc(dep_info, "scheduledTime")
+            or dep_info.get("scheduledTimeUtc")
+            or dep_info.get("scheduledTimeLocal")
             or _safe_get_utc(movement, "scheduledTime")
-            or f"{query.departure_date}T12:00:00Z"
+            or (f"{query.departure_date}T12:00:00Z" if self.aerodatabox.mock_mode else None)
         )
         sched_arr_str = (
             _safe_get_utc(arr_info, "scheduledTime")
-            or f"{query.departure_date}T14:30:00Z"
+            or arr_info.get("scheduledTimeUtc")
+            or arr_info.get("scheduledTimeLocal")
+            or (f"{query.departure_date}T14:30:00Z" if self.aerodatabox.mock_mode else None)
         )
         act_dep_str = (
             _safe_get_utc(dep_info, "actualTime")
+            or dep_info.get("actualTimeUtc")
+            or dep_info.get("actualTimeLocal")
             or _safe_get_utc(dep_info, "revisedTime")
             or _safe_get_utc(movement, "revisedTime")
         )
         act_arr_str = (
             _safe_get_utc(arr_info, "actualTime")
+            or arr_info.get("actualTimeUtc")
+            or arr_info.get("actualTimeLocal")
             or _safe_get_utc(arr_info, "revisedTime")
         )
 
-        sched_dep = parse_iso_datetime(sched_dep_str)
-        sched_arr = parse_iso_datetime(sched_arr_str)
+        sched_dep = parse_iso_datetime(sched_dep_str) or datetime.now(timezone.utc)
+        sched_arr = parse_iso_datetime(sched_arr_str) or (datetime.now(timezone.utc) + timedelta(hours=2))
         act_dep = parse_iso_datetime(act_dep_str)
         act_arr = parse_iso_datetime(act_arr_str)
         status = str(flight_raw.get("status", "SCHEDULED")).upper()
@@ -147,6 +171,8 @@ class FlightAggregator:
             flight_number=f"{query.carrier}{query.flight_number}",
             origin_iata=origin_iata,
             destination_iata=destination_iata,
+            origin_name=origin_name,
+            destination_name=destination_name,
             scheduled_departure=sched_dep,
             scheduled_arrival=sched_arr,
             actual_departure=act_dep,
@@ -156,9 +182,17 @@ class FlightAggregator:
 
         # 3. Aircraft info & Inbound Rotations
         aircraft_raw = flight_raw.get("aircraft") or {}
-        tail_number = aircraft_raw.get("reg") or "N123UA"
-        icao_type = aircraft_raw.get("typeCode") or "B738"
-        mode_s = aircraft_raw.get("modeS") or aircraft_raw.get("icao24") or "a06041"
+        tail_number = aircraft_raw.get("reg")
+        if not tail_number:
+            tail_number = "N123UA" if self.aerodatabox.mock_mode else "UNAVAILABLE"
+
+        icao_type = aircraft_raw.get("typeCode")
+        if not icao_type:
+            icao_type = "B738" if self.aerodatabox.mock_mode else "UNKNOWN"
+
+        mode_s = aircraft_raw.get("modeS") or aircraft_raw.get("icao24")
+        if not mode_s and self.aerodatabox.mock_mode:
+            mode_s = "a06041"
 
         category = categorize_aircraft(icao_type)
         mtt_minutes = MTT_MAP[category]
@@ -169,14 +203,21 @@ class FlightAggregator:
             category=category,
         )
 
-        previous_legs = await self.aerodatabox.get_inbound_rotations(
-            tail_number=tail_number,
-            date=str(query.departure_date),
-        )
+        if tail_number.upper() in ("PENDING", "UNAVAILABLE", "UNKNOWN"):
+            previous_legs = []
+        else:
+            previous_legs = await self.aerodatabox.get_inbound_rotations(
+                tail_number=tail_number,
+                date=str(query.departure_date),
+            )
 
         # 4. Live telemetry via OpenSky
         callsign = flight_raw.get("callsign") or f"{query.carrier}{query.flight_number}"
-        live_telemetry = await self.opensky.get_aircraft_state(mode_s or callsign)
+        telemetry_target = mode_s or (callsign if not self.aerodatabox.mock_mode else None)
+        if telemetry_target:
+            live_telemetry = await self.opensky.get_aircraft_state(telemetry_target)
+        else:
+            live_telemetry = None
 
         # Write live telemetry to Redis with 60s TTL
         if live_telemetry:

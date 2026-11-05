@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Annotated, List, Literal
+from typing import Annotated, Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 CarrierCode = Annotated[
@@ -76,6 +76,8 @@ class FlightLeg(BaseModel):
     destination_iata: IataCode = Field(
         ..., description="3-letter IATA destination airport code"
     )
+    origin_name: Optional[str] = Field(default=None, description="Departure airport full name")
+    destination_name: Optional[str] = Field(default=None, description="Arrival airport full name")
     scheduled_departure: datetime = Field(..., description="Scheduled departure timestamp")
     scheduled_arrival: datetime = Field(..., description="Scheduled arrival timestamp")
     actual_departure: datetime | None = Field(
@@ -237,6 +239,14 @@ class RealityAssessment(BaseModel):
         ...,
         description="Flight queried by the traveler",
     )
+    origin_iata: str = Field(..., description="Departure airport 3-letter IATA code, e.g., DTW")
+    destination_iata: str = Field(..., description="Arrival airport 3-letter IATA code, e.g., SEA")
+    origin_name: Optional[str] = Field(default=None, description="Departure airport full name")
+    destination_name: Optional[str] = Field(default=None, description="Arrival airport full name")
+    scheduled_departure: Optional[datetime] = Field(default=None, description="Scheduled departure timestamp")
+    actual_or_estimated_departure: Optional[datetime] = Field(default=None, description="Actual or estimated departure timestamp")
+    scheduled_arrival: Optional[datetime] = Field(default=None, description="Scheduled arrival timestamp")
+    actual_or_estimated_arrival: Optional[datetime] = Field(default=None, description="Actual or estimated arrival timestamp")
     official_airline_departure: datetime = Field(
         ...,
         description="Official published departure time from airline channels",
@@ -274,4 +284,12 @@ class RealityAssessment(BaseModel):
     crew_duty: CrewDutyAssessment | None = Field(
         default=None,
         description="FAA Part 117 flight crew duty hours and timeout risk evaluation",
+    )
+    inbound_turnaround: Optional[InboundTurnaround] = Field(
+        default=None,
+        description="Inbound turnaround and upstream aircraft rotation context",
+    )
+    live_telemetry: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Live transponder aircraft state vector from OpenSky",
     )

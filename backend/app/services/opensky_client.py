@@ -44,7 +44,20 @@ class OpenSkyClient:
             with open(fixture_path, "r", encoding="utf-8") as f:
                 return json.load(f)
 
+        inactive_fallback = {
+            "callsign": icao24_or_callsign.strip().upper(),
+            "baro_altitude_ft": None,
+            "ground_speed_kts": None,
+            "on_ground": True,
+            "latitude": None,
+            "longitude": None,
+            "last_contact_epoch": None,
+        }
+
         target = icao24_or_callsign.strip().lower()
+        if not target or target in ("pending", "unavailable", "unknown"):
+            return inactive_fallback
+
         params = {}
         if len(target) == 6 and all(c in "0123456789abcdef" for c in target):
             params["icao24"] = target
@@ -64,12 +77,12 @@ class OpenSkyClient:
                 )
                 if response.status_code != 200:
                     logger.warning("OpenSky API returned HTTP %s", response.status_code)
-                    return None
+                    return inactive_fallback
 
                 data = response.json()
                 states = data.get("states", [])
                 if not states:
-                    return None
+                    return inactive_fallback
 
                 # Find matching state
                 for st in states:
@@ -99,7 +112,10 @@ class OpenSkyClient:
                             "longitude": st[5],
                             "last_contact_epoch": st[4],
                         }
-                return None
+                return inactive_fallback
             except Exception as exc:
                 logger.error("OpenSky fetch failed: %s", exc)
-                return None
+                return inactive_fallback
+
+    # Alias for method name compatibility
+    get_state_vector = get_aircraft_state

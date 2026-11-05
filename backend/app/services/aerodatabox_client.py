@@ -238,6 +238,9 @@ class AeroDataBoxClient:
             try:
                 response = await client.get(url, headers=headers)
                 logger.info("AeroDataBoxClient: [LIVE INGESTION] Response received with status %s", response.status_code)
+                if response.status_code == 404:
+                    logger.warning("AeroDataBox returned 404 for %s%s on %s", carrier, flight_num, date)
+                    return {}
                 if response.status_code == 429:
                     raise AeroDataBoxRateLimitError(
                         "Rate limit exceeded (HTTP 429) for AeroDataBox API."
@@ -250,8 +253,10 @@ class AeroDataBoxClient:
                 data = response.json()
                 if isinstance(data, list):
                     return data[0] if data else {}
-                return data
+                return data or {}
             except httpx.HTTPStatusError as exc:
+                if exc.response.status_code == 404:
+                    return {}
                 if exc.response.status_code == 429:
                     raise AeroDataBoxRateLimitError(str(exc)) from exc
                 if exc.response.status_code == 503:
@@ -264,6 +269,10 @@ class AeroDataBoxClient:
         self, tail_number: str, date: str
     ) -> List[FlightLeg]:
         """Fetch up to 2 preceding legs for the assigned aircraft tail."""
+        if not tail_number or tail_number.upper() in ("PENDING", "UNAVAILABLE", "UNKNOWN"):
+            logger.info("AeroDataBoxClient: Skipping rotations fetch for placeholder tail %s", tail_number)
+            return []
+
         if self.mock_mode:
             logger.info(
                 "AeroDataBoxClient: [MOCK REPLAY] Loading local rotation fixture for tail %s on %s",
@@ -283,13 +292,16 @@ class AeroDataBoxClient:
             try:
                 response = await client.get(url, headers=headers)
                 logger.info("AeroDataBoxClient: [LIVE INGESTION] Rotation response received with status %s", response.status_code)
+                if response.status_code == 404:
+                    logger.warning("AeroDataBox rotations returned 404 for tail %s on %s", tail_number, date)
+                    return []
                 if response.status_code == 429:
                     raise AeroDataBoxRateLimitError("Rate limit exceeded (HTTP 429)")
                 if response.status_code == 503:
                     raise AeroDataBoxServiceUnavailableError("Service unavailable (HTTP 503)")
                 response.raise_for_status()
                 raw_legs = response.json()
-                if not isinstance(raw_legs, list):
+                if not isinstance(raw_legs, list) or not raw_legs:
                     return []
 
                 parsed_legs: List[FlightLeg] = []
@@ -302,26 +314,36 @@ class AeroDataBoxClient:
                         or dep.get("origin_iata")
                         or "ZZZ"
                     )
+                    origin_name = dep.get("airport", {}).get("name")
                     dest = (
                         arr.get("airport", {}).get("iata")
                         or arr.get("destination_iata")
                         or "ZZZ"
                     )
+                    dest_name = arr.get("airport", {}).get("name")
                     sched_dep = parse_iso_datetime(
                         dep.get("scheduledTime", {}).get("utc")
+                        or dep.get("scheduledTimeUtc")
+                        or dep.get("scheduledTimeLocal")
                         or leg_data.get("scheduled_departure")
                     )
                     sched_arr = parse_iso_datetime(
                         arr.get("scheduledTime", {}).get("utc")
+                        or arr.get("scheduledTimeUtc")
+                        or arr.get("scheduledTimeLocal")
                         or leg_data.get("scheduled_arrival")
                     )
                     act_dep = parse_iso_datetime(
                         dep.get("actualTime", {}).get("utc")
+                        or dep.get("actualTimeUtc")
+                        or dep.get("actualTimeLocal")
                         or dep.get("revisedTime", {}).get("utc")
                         or leg_data.get("actual_departure")
                     )
                     act_arr = parse_iso_datetime(
                         arr.get("actualTime", {}).get("utc")
+                        or arr.get("actualTimeUtc")
+                        or arr.get("actualTimeLocal")
                         or arr.get("revisedTime", {}).get("utc")
                         or leg_data.get("actual_arrival")
                     )
@@ -333,6 +355,8 @@ class AeroDataBoxClient:
                                 flight_number=flight_no,
                                 origin_iata=origin,
                                 destination_iata=dest,
+                                origin_name=origin_name,
+                                destination_name=dest_name,
                                 scheduled_departure=sched_dep,
                                 scheduled_arrival=sched_arr,
                                 actual_departure=act_dep,
@@ -342,6 +366,8 @@ class AeroDataBoxClient:
                         )
                 return parsed_legs[-2:]
             except httpx.HTTPStatusError as exc:
+                if exc.response.status_code == 404:
+                    return []
                 if exc.response.status_code == 429:
                     raise AeroDataBoxRateLimitError(str(exc)) from exc
                 if exc.response.status_code == 503:
