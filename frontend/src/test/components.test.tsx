@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import { FlightSearch } from '../components/FlightSearch';
+import { FlightSearch, formatLocalDate } from '../components/FlightSearch';
 import { GroundRealityCard } from '../components/GroundRealityCard';
 import { useFlightStream, MAX_RECONNECT_ATTEMPTS } from '../hooks/useFlightStream';
 import { RealityAssessment } from '../types/flight';
@@ -74,10 +74,10 @@ describe('FlightSearch Component', () => {
     const todayBtn = screen.getByTestId('preset-today-btn');
     const tomorrowBtn = screen.getByTestId('preset-tomorrow-btn');
 
-    const expectedToday = new Date().toISOString().split('T')[0];
+    const expectedToday = formatLocalDate(new Date());
     const tomorrowDate = new Date();
     tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-    const expectedTomorrow = tomorrowDate.toISOString().split('T')[0];
+    const expectedTomorrow = formatLocalDate(tomorrowDate);
 
     // Click Tomorrow
     fireEvent.click(tomorrowBtn);

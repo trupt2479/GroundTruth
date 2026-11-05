@@ -38,16 +38,23 @@ interface FlightSearchProps {
   isLoading: boolean;
 }
 
+export const formatLocalDate = (d: Date = new Date()): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export const FlightSearch: React.FC<FlightSearchProps> = ({ onSearch, isLoading }) => {
-  const getTodayISO = () => new Date().toISOString().split('T')[0];
-  const getTomorrowISO = () => {
+  const getToday = () => formatLocalDate(new Date());
+  const getTomorrow = () => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
-    return d.toISOString().split('T')[0];
+    return formatLocalDate(d);
   };
 
-  const today = getTodayISO();
-  const tomorrow = getTomorrowISO();
+  const today = getToday();
+  const tomorrow = getTomorrow();
 
   const [carrier, setCarrier] = useState('UA');
   const [flightNumber, setFlightNumber] = useState('1422');
@@ -135,7 +142,7 @@ export const FlightSearch: React.FC<FlightSearchProps> = ({ onSearch, isLoading 
                   type="button"
                   data-testid="preset-today-btn"
                   onClick={() => {
-                    setDepartureDate(getTodayISO());
+                    setDepartureDate(getToday());
                     setValidationError(null);
                   }}
                   className={`text-[10px] font-semibold px-2 py-0.5 rounded transition cursor-pointer border ${
@@ -150,7 +157,7 @@ export const FlightSearch: React.FC<FlightSearchProps> = ({ onSearch, isLoading 
                   type="button"
                   data-testid="preset-tomorrow-btn"
                   onClick={() => {
-                    setDepartureDate(getTomorrowISO());
+                    setDepartureDate(getTomorrow());
                     setValidationError(null);
                   }}
                   className={`text-[10px] font-semibold px-2 py-0.5 rounded transition cursor-pointer border ${
@@ -196,7 +203,7 @@ export const FlightSearch: React.FC<FlightSearchProps> = ({ onSearch, isLoading 
                   onClick={() => {
                     setCarrier(s.carrier);
                     setFlightNumber(s.flightNumber);
-                    setDepartureDate(getTodayISO());
+                    setDepartureDate(getToday());
                     setValidationError(null);
                   }}
                   className={`p-2 rounded-xl text-left border transition text-xs flex flex-col justify-center cursor-pointer ${
