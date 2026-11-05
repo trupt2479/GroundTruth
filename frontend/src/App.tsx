@@ -6,24 +6,21 @@ import { useFlightStream } from './hooks/useFlightStream';
 import { RealityAssessment } from './types/flight';
 import { Activity, Radio, AlertCircle } from 'lucide-react';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 export const App: React.FC = () => {
   const [activeQuery, setActiveQuery] = useState<{
     carrier: string;
     flightNumber: string;
     date: string;
-  } | null>({
-    carrier: 'UA',
-    flightNumber: '1422',
-    date: new Date().toISOString().split('T')[0],
-  });
+    scanTrigger: number;
+  } | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [initialAssessment, setInitialAssessment] = useState<RealityAssessment | null>(null);
 
-  // Subscribe to real-time SSE stream
+  // Subscribe to real-time SSE stream - fires ONLY when activeQuery is populated by clicking "Scan Turnaround Physics"
   const {
     assessment: streamedAssessment,
     isConnected,
@@ -33,13 +30,14 @@ export const App: React.FC = () => {
   } = useFlightStream(
     activeQuery?.carrier || null,
     activeQuery?.flightNumber || null,
-    activeQuery?.date || null
+    activeQuery?.date || null,
+    activeQuery?.scanTrigger
   );
 
   const handleSearch = async (carrier: string, flightNumber: string, date: string) => {
     setIsLoading(true);
     setFetchError(null);
-    setActiveQuery({ carrier, flightNumber, date });
+    setActiveQuery({ carrier, flightNumber, date, scanTrigger: Date.now() });
 
     try {
       const resp = await fetch(

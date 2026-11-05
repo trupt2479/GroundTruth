@@ -2,9 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { RealityAssessment } from '../types/flight';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-const MAX_RECONNECT_ATTEMPTS = 5;
-const BASE_BACKOFF_MS = 2000;
-const MAX_BACKOFF_MS = 15000;
+export const MAX_RECONNECT_ATTEMPTS = 0;
 
 interface UseFlightStreamResult {
   assessment: RealityAssessment | null;
@@ -17,7 +15,8 @@ interface UseFlightStreamResult {
 export function useFlightStream(
   carrier: string | null,
   flightNum: string | null,
-  date: string | null
+  date: string | null,
+  scanTrigger?: number
 ): UseFlightStreamResult {
   const [assessment, setAssessment] = useState<RealityAssessment | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -26,15 +25,13 @@ export function useFlightStream(
   const [lastTickTime, setLastTickTime] = useState<number | null>(null);
 
   const eventSourceRef = useRef<EventSource | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const reconnectAttemptsRef = useRef(0);
 
   const connect = useCallback(() => {
     if (!carrier || !flightNum || !date) {
       return;
     }
 
-    // Close any prior connection
+    // Close any prior connection immediately
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
@@ -48,7 +45,6 @@ export function useFlightStream(
       setIsConnected(true);
       setIsReconnecting(false);
       setError(null);
-      reconnectAttemptsRef.current = 0;
     };
 
     es.addEventListener('INITIAL', (e: MessageEvent) => {
@@ -76,32 +72,13 @@ export function useFlightStream(
     });
 
     es.onerror = () => {
+      // Zero-Auto-Retry: strictly manual-only.
+      // Immediately close connection, do NOT initiate any setTimeout reconnections.
       es.close();
       eventSourceRef.current = null;
       setIsConnected(false);
-
-      reconnectAttemptsRef.current += 1;
-
-      if (reconnectAttemptsRef.current > MAX_RECONNECT_ATTEMPTS) {
-        setIsReconnecting(false);
-        setError('Stream disconnected. Maximum reconnection attempts reached. Please refresh.');
-        return;
-      }
-
-      setIsReconnecting(true);
-      // Exponential backoff: 2s, 4s, 8s, up to 15s max
-      const backoffMs = Math.min(
-        BASE_BACKOFF_MS * Math.pow(2, reconnectAttemptsRef.current - 1),
-        MAX_BACKOFF_MS
-      );
-
-      setError(
-        `Connection lost. Reconnecting in ${(backoffMs / 1000).toFixed(0)}s (attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})...`
-      );
-
-      reconnectTimeoutRef.current = setTimeout(() => {
-        connect();
-      }, backoffMs);
+      setIsReconnecting(false);
+      setError('Live stream disconnected. Scan again to reconnect.');
     };
   }, [carrier, flightNum, date]);
 
@@ -109,15 +86,12 @@ export function useFlightStream(
     connect();
 
     return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
     };
-  }, [connect]);
+  }, [connect, scanTrigger]);
 
   return { assessment, isConnected, isReconnecting, error, lastTickTime };
 }

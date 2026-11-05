@@ -1,7 +1,8 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { FlightSearch } from '../components/FlightSearch';
 import { GroundRealityCard } from '../components/GroundRealityCard';
+import { useFlightStream, MAX_RECONNECT_ATTEMPTS } from '../hooks/useFlightStream';
 import { RealityAssessment } from '../types/flight';
 
 describe('FlightSearch Component', () => {
@@ -35,6 +36,72 @@ describe('FlightSearch Component', () => {
     fireEvent.click(submitBtn);
 
     expect(onSearchMock).toHaveBeenCalledWith('DL', '888', expect.any(String));
+  });
+
+  it('populates fields when a quick scenario pill is clicked', () => {
+    const onSearchMock = vi.fn();
+    render(<FlightSearch onSearch={onSearchMock} isLoading={false} />);
+
+    const carrierInput = screen.getByLabelText(/carrier/i) as HTMLInputElement;
+    const flightInput = screen.getByLabelText(/flight #/i) as HTMLInputElement;
+
+    // Click Scenario 2 (DL 450)
+    const dlBtn = screen.getByTestId('scenario-btn-DL-450');
+    fireEvent.click(dlBtn);
+
+    expect(carrierInput.value).toBe('DL');
+    expect(flightInput.value).toBe('450');
+
+    // Click Scenario 3 (AA 1200)
+    const aaBtn = screen.getByTestId('scenario-btn-AA-1200');
+    fireEvent.click(aaBtn);
+
+    expect(carrierInput.value).toBe('AA');
+    expect(flightInput.value).toBe('1200');
+
+    // Submit after scenario selection
+    const submitBtn = screen.getByRole('button', { name: /scan turnaround/i });
+    fireEvent.click(submitBtn);
+
+    expect(onSearchMock).toHaveBeenCalledWith('AA', '1200', expect.any(String));
+  });
+});
+
+describe('useFlightStream Hook Zero-Auto-Retry', () => {
+  it('enforces MAX_RECONNECT_ATTEMPTS = 0 and does not initiate reconnection timeouts on error', () => {
+    expect(MAX_RECONNECT_ATTEMPTS).toBe(0);
+
+    let errorHandler: (() => void) | null = null;
+    const closeSpy = vi.fn();
+
+    class MockEventSource {
+      close = closeSpy;
+      addEventListener = vi.fn();
+      set onerror(handler: () => void) {
+        errorHandler = handler;
+      }
+      onopen = vi.fn();
+    }
+
+    vi.stubGlobal('EventSource', MockEventSource);
+
+    const { result } = renderHook(() =>
+      useFlightStream('UA', '1422', '2026-10-24')
+    );
+
+    // Simulate error event on connection
+    act(() => {
+      if (errorHandler) {
+        errorHandler();
+      }
+    });
+
+    expect(closeSpy).toHaveBeenCalled();
+    expect(result.current.isConnected).toBe(false);
+    expect(result.current.isReconnecting).toBe(false);
+    expect(result.current.error).toContain('Live stream disconnected');
+
+    vi.unstubAllGlobals();
   });
 });
 

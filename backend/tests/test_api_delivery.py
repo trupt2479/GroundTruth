@@ -44,6 +44,45 @@ def test_evaluate_flight_success(client):
     ]
 
 
+def test_evaluate_flight_dl450_scenario(client):
+    """Test Scenario 2 (DL 450): Hub Spare Available at Fortress Hub ATL."""
+    response = client.get(
+        "/api/v1/flights/evaluate",
+        params={
+            "carrier": "DL",
+            "flight_num": "450",
+            "date": "2026-10-24",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assessment = RealityAssessment.model_validate(data)
+    assert assessment.flight_query.carrier == "DL"
+    assert assessment.flight_query.flight_number == "450"
+    assert assessment.swap_evaluation.origin_is_hub is True
+    assert assessment.swap_evaluation.hub_type == "FORTRESS_HUB"
+
+
+def test_evaluate_flight_aa1200_scenario(client):
+    """Test Scenario 3 (AA 1200): Outstation Inbound Delay Trap at BDL."""
+    response = client.get(
+        "/api/v1/flights/evaluate",
+        params={
+            "carrier": "AA",
+            "flight_num": "1200",
+            "date": "2026-10-24",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assessment = RealityAssessment.model_validate(data)
+    assert assessment.flight_query.carrier == "AA"
+    assert assessment.flight_query.flight_number == "1200"
+    assert assessment.is_unavoidable_delay is True
+    assert assessment.swap_evaluation.origin_is_hub is False
+    assert assessment.rebooking_directive == "EXPEDITE_REBOOKING"
+
+
 def test_evaluate_flight_invalid_carrier_422(client):
     """Test GET /api/v1/flights/evaluate returns 422 on invalid carrier (lowercase or length)."""
     # Lowercase carrier
@@ -154,5 +193,3 @@ async def test_sse_stream_initial_event_and_heartbeat():
     assert "event: INITIAL" in events[0]
     assert "data: {" in events[0]
     assert "event: TICK" in events[1] or ": keep-alive" in events[1] or "event: UPDATE" in events[1]
-
-

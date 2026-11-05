@@ -63,9 +63,13 @@ class AeroDataBoxClient:
         )
 
     def _load_fixture(
-        self, filename: str, target_date: Optional[str] = None
+        self,
+        filename: str,
+        target_date: Optional[str] = None,
+        carrier: Optional[str] = None,
+        flight_num: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Load local mock fixture and adapt dates to the requested target_date."""
+        """Load local mock fixture and adapt dates and scenario parameters."""
         fixture_path = FIXTURES_DIR / filename
         if not fixture_path.exists():
             raise FileNotFoundError(f"Fixture not found at {fixture_path}")
@@ -73,16 +77,92 @@ class AeroDataBoxClient:
             content = f.read()
 
         if target_date:
-            # Dynamically replace sample date 2026-10-24 with target_date
             content = content.replace("2026-10-24", target_date)
 
         data = json.loads(content)
         if isinstance(data, list):
-            return data[0] if data else {}
+            data = data[0] if data else {}
+
+        # Scenario customizations for offline demonstrations
+        c = (carrier or "").upper()
+        fn = (flight_num or "").strip()
+        t_date = target_date or "2026-10-24"
+
+        if c == "DL" and fn == "450":
+            # Scenario 2: DL 450 (Hub Spare Available / Low Risk Turnaround at Fortress Hub ATL)
+            data["number"] = "DL450"
+            data["callsign"] = "DAL450"
+            data["status"] = "Scheduled"
+            if "departure" in data:
+                data["departure"]["airport"] = {
+                    "iata": "ATL",
+                    "icao": "KATL",
+                    "name": "Hartsfield-Jackson Atlanta International Airport",
+                }
+                data["departure"]["scheduledTime"] = {"utc": f"{t_date} 14:00Z"}
+                data["departure"]["revisedTime"] = {"utc": f"{t_date} 14:00Z"}
+                data["departure"]["actualTime"] = None
+            if "movement" in data:
+                data["movement"]["airport"] = {
+                    "iata": "ATL",
+                    "icao": "KATL",
+                    "name": "Hartsfield-Jackson Atlanta International Airport",
+                }
+                data["movement"]["scheduledTime"] = {"utc": f"{t_date} 14:00Z"}
+                data["movement"]["revisedTime"] = {"utc": f"{t_date} 14:00Z"}
+            if "arrival" in data:
+                data["arrival"]["airport"] = {
+                    "iata": "MCO",
+                    "icao": "KMCO",
+                    "name": "Orlando International Airport",
+                }
+                data["arrival"]["scheduledTime"] = {"utc": f"{t_date} 15:30Z"}
+                data["arrival"]["revisedTime"] = {"utc": f"{t_date} 15:30Z"}
+            if "aircraft" in data:
+                data["aircraft"]["reg"] = "N450DL"
+                data["aircraft"]["typeCode"] = "A321"
+
+        elif c == "AA" and fn == "1200":
+            # Scenario 3: AA 1200 (Outstation Inbound Delay Trap at Outstation BDL)
+            data["number"] = "AA1200"
+            data["callsign"] = "AAL1200"
+            data["status"] = "Delayed"
+            if "departure" in data:
+                data["departure"]["airport"] = {
+                    "iata": "BDL",
+                    "icao": "KBDL",
+                    "name": "Bradley International Airport",
+                }
+                data["departure"]["scheduledTime"] = {"utc": f"{t_date} 15:00Z"}
+                data["departure"]["revisedTime"] = {"utc": f"{t_date} 15:00Z"}
+                data["departure"]["actualTime"] = None
+            if "movement" in data:
+                data["movement"]["airport"] = {
+                    "iata": "BDL",
+                    "icao": "KBDL",
+                    "name": "Bradley International Airport",
+                }
+                data["movement"]["scheduledTime"] = {"utc": f"{t_date} 15:00Z"}
+                data["movement"]["revisedTime"] = {"utc": f"{t_date} 15:00Z"}
+            if "arrival" in data:
+                data["arrival"]["airport"] = {
+                    "iata": "ORD",
+                    "icao": "KORD",
+                    "name": "Chicago O'Hare International Airport",
+                }
+                data["arrival"]["scheduledTime"] = {"utc": f"{t_date} 17:30Z"}
+                data["arrival"]["revisedTime"] = {"utc": f"{t_date} 17:30Z"}
+            if "aircraft" in data:
+                data["aircraft"]["reg"] = "N1200A"
+                data["aircraft"]["typeCode"] = "B738"
+
         return data
 
     def _load_rotations_fixture(
-        self, filename: str, target_date: Optional[str] = None
+        self,
+        filename: str,
+        target_date: Optional[str] = None,
+        tail_number: Optional[str] = None,
     ) -> List[FlightLeg]:
         """Load local rotation fixtures and adapt timestamps to target_date."""
         fixture_path = FIXTURES_DIR / filename
@@ -96,6 +176,39 @@ class AeroDataBoxClient:
 
         items = json.loads(content)
         legs = [FlightLeg.model_validate(item) for item in items]
+
+        t_date = target_date or "2026-10-24"
+        tail = (tail_number or "").upper()
+
+        if tail == "N450DL":
+            # Feasible turn at ATL: inbound arrives at 13:00Z, departure at 14:00Z (60m turn > 45m MTT)
+            return [
+                FlightLeg(
+                    flight_number="DL881",
+                    origin_iata="BOS",
+                    destination_iata="ATL",
+                    scheduled_departure=datetime.fromisoformat(f"{t_date}T10:30:00+00:00"),
+                    scheduled_arrival=datetime.fromisoformat(f"{t_date}T13:00:00+00:00"),
+                    actual_departure=datetime.fromisoformat(f"{t_date}T10:30:00+00:00"),
+                    actual_arrival=datetime.fromisoformat(f"{t_date}T13:00:00+00:00"),
+                    status="LANDED",
+                )
+            ]
+        elif tail == "N1200A":
+            # Outstation delay trap: inbound arrives at 15:45Z (45m after scheduled departure 15:00Z)
+            return [
+                FlightLeg(
+                    flight_number="AA512",
+                    origin_iata="ORD",
+                    destination_iata="BDL",
+                    scheduled_departure=datetime.fromisoformat(f"{t_date}T12:00:00+00:00"),
+                    scheduled_arrival=datetime.fromisoformat(f"{t_date}T14:15:00+00:00"),
+                    actual_departure=datetime.fromisoformat(f"{t_date}T13:30:00+00:00"),
+                    actual_arrival=datetime.fromisoformat(f"{t_date}T15:45:00+00:00"),
+                    status="LANDED",
+                )
+            ]
+
         return legs[-2:]
 
     async def get_flight_status(
@@ -112,7 +225,7 @@ class AeroDataBoxClient:
                 flight_num,
                 date,
             )
-            return self._load_fixture("sample_aerodatabox_flight.json", date)
+            return self._load_fixture("sample_aerodatabox_flight.json", date, carrier, flight_num)
 
         url = f"{self.base_url}/flights/number/{carrier}{flight_num}/{date}"
         headers = {
@@ -157,7 +270,7 @@ class AeroDataBoxClient:
                 tail_number,
                 date,
             )
-            return self._load_rotations_fixture("sample_aerodatabox_rotations.json", date)
+            return self._load_rotations_fixture("sample_aerodatabox_rotations.json", date, tail_number)
 
         url = f"{self.base_url}/flights/reg/{tail_number}/{date}"
         headers = {
