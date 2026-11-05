@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { FlightSearch, formatLocalDate } from '../components/FlightSearch';
 import { GroundRealityCard } from '../components/GroundRealityCard';
 import { InboundVisualizer } from '../components/InboundVisualizer';
+import { WatchlistDrawer } from '../components/WatchlistDrawer';
 import { useFlightStream, MAX_RECONNECT_ATTEMPTS } from '../hooks/useFlightStream';
 import { RealityAssessment } from '../types/flight';
 
@@ -140,8 +141,7 @@ describe('useFlightStream Hook Zero-Auto-Retry', () => {
   });
 });
 
-describe('GroundRealityCard Component', () => {
-  const mockAssessmentDelay: RealityAssessment = {
+const mockAssessmentDelay: RealityAssessment = {
     flight_query: {
       carrier: 'UA',
       flight_number: '1422',
@@ -166,6 +166,8 @@ describe('GroundRealityCard Component', () => {
     },
     rebooking_directive: 'EXPEDITE_REBOOKING',
   };
+
+describe('GroundRealityCard Component', () => {
 
   it('renders unavoidable delay, lead time delta, and rebooking directive', () => {
     render(<GroundRealityCard assessment={mockAssessmentDelay} />);
@@ -430,5 +432,103 @@ describe('InboundVisualizer Component Live Transparency', () => {
     expect(screen.getByText('Airborne')).toBeInTheDocument();
     expect(screen.getByText('31,000 ft')).toBeInTheDocument();
     expect(screen.getByText('460 kts')).toBeInTheDocument();
+  });
+});
+
+describe('Watchlist Features (GT-WATCH-01)', () => {
+  it('renders Watch Flight button in GroundRealityCard and triggers watchlist save', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      status: 201,
+      ok: true,
+      json: async () => ({
+        id: '123e4567-e89b-12d3-a456-426614174000',
+        user_name: 'Trupti',
+        carrier: 'UA',
+        flight_number: '1422',
+        departure_date: '2026-10-24',
+        status: 'ARMED',
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<GroundRealityCard assessment={mockAssessmentDelay} />);
+
+    const watchBtn = screen.getByTestId('watch-flight-btn');
+    expect(watchBtn).toBeInTheDocument();
+    expect(screen.getByText(/watch flight/i)).toBeInTheDocument();
+
+    fireEvent.click(watchBtn);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/watchlist',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_name: 'Trupti',
+          carrier: 'UA',
+          flight_number: '1422',
+          departure_date: '2026-10-24',
+        }),
+      })
+    );
+
+    expect(await screen.findByText(/watching/i)).toBeInTheDocument();
+
+    vi.unstubAllGlobals();
+  });
+
+  it('renders WatchlistDrawer and displays watched flights and delete action', async () => {
+    const mockItems = [
+      {
+        id: 'item-dl-565',
+        user_name: 'Trupti',
+        carrier: 'DL',
+        flight_number: '565',
+        departure_date: '2026-11-05',
+        origin_iata: 'DTW',
+        destination_iata: 'SEA',
+        origin_name: 'Detroit Metro',
+        destination_name: 'Seattle Tacoma',
+        scheduled_departure: '2026-11-05T01:11:00Z',
+        t2_scheduled_fetch: '2026-11-04T23:11:00Z',
+        status: 'ARMED',
+        latest_assessment: {
+          delay_lead_time_minutes: 0,
+        },
+        created_at: '2026-11-05T00:00:00Z',
+      },
+    ];
+
+    const fetchMock = vi.fn().mockImplementation((_url: string, options?: RequestInit) => {
+      if (options?.method === 'DELETE') {
+        return Promise.resolve({ ok: true, json: async () => ({ status: 'success' }) });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => mockItems,
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { rerender } = render(<WatchlistDrawer isOpen={false} onClose={vi.fn()} />);
+    expect(screen.queryByTestId('watchlist-drawer')).not.toBeInTheDocument();
+
+    rerender(<WatchlistDrawer isOpen={true} onClose={vi.fn()} />);
+    expect(screen.getByTestId('watchlist-drawer')).toBeInTheDocument();
+
+    expect(await screen.findByText(/DL 565/i)).toBeInTheDocument();
+    expect(screen.getByText(/DTW → SEA/i)).toBeInTheDocument();
+    expect(screen.getByText(/Armed for T-2h check/i)).toBeInTheDocument();
+
+    // Trigger delete
+    const deleteBtn = screen.getByTestId('delete-watchlist-item-dl-565');
+    await act(async () => {
+      fireEvent.click(deleteBtn);
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/watchlist/item-dl-565', { method: 'DELETE' });
+
+    vi.unstubAllGlobals();
   });
 });

@@ -4,7 +4,8 @@ import { GroundRealityCard } from './components/GroundRealityCard';
 import { InboundVisualizer } from './components/InboundVisualizer';
 import { useFlightStream } from './hooks/useFlightStream';
 import { RealityAssessment } from './types/flight';
-import { Activity, Radio, AlertCircle } from 'lucide-react';
+import { Activity, Radio, AlertCircle, Bookmark } from 'lucide-react';
+import { WatchlistDrawer } from './components/WatchlistDrawer';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -19,6 +20,25 @@ export const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [initialAssessment, setInitialAssessment] = useState<RealityAssessment | null>(null);
+  const [isWatchlistOpen, setIsWatchlistOpen] = useState(false);
+  const [watchlistCount, setWatchlistCount] = useState<number>(0);
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+
+  const fetchWatchlistCount = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/watchlist?user_name=Trupti`);
+      if (res.ok) {
+        const data = await res.json();
+        setWatchlistCount(Array.isArray(data) ? data.length : 0);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  React.useEffect(() => {
+    fetchWatchlistCount();
+  }, [refreshTrigger]);
 
   // Subscribe to real-time SSE stream - fires ONLY when activeQuery is populated by clicking "Scan Turnaround Physics"
   const {
@@ -83,12 +103,31 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Live SSE Status Indicator */}
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px]">
-          <Radio className={`w-3 h-3 ${isConnected ? 'text-emerald-400 animate-pulse' : 'text-slate-500'}`} />
-          <span className="text-slate-300 font-mono text-[10px]">
-            {isReconnecting ? 'Reconnecting' : isConnected ? 'Live SSE' : 'Offline'}
-          </span>
+        <div className="flex items-center gap-2">
+          {/* Watchlist Header Button with Counter */}
+          <button
+            type="button"
+            onClick={() => setIsWatchlistOpen(true)}
+            data-testid="header-watchlist-btn"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 hover:bg-slate-850 border border-slate-800 text-[11px] text-slate-300 font-medium transition cursor-pointer"
+          >
+            <Bookmark className="w-3 h-3 text-amber-400" />
+            <span>My Watchlist</span>
+            <span
+              data-testid="header-watchlist-badge"
+              className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30"
+            >
+              {watchlistCount}
+            </span>
+          </button>
+
+          {/* Live SSE Status Indicator */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px]">
+            <Radio className={`w-3 h-3 ${isConnected ? 'text-emerald-400 animate-pulse' : 'text-slate-500'}`} />
+            <span className="text-slate-300 font-mono text-[10px]">
+              {isReconnecting ? 'Reconnecting' : isConnected ? 'Live SSE' : 'Offline'}
+            </span>
+          </div>
         </div>
       </header>
 
@@ -121,7 +160,7 @@ export const App: React.FC = () => {
         {/* Ground Reality Card */}
         {displayAssessment && (
           <div className="space-y-4 animate-fadeIn">
-            <GroundRealityCard assessment={displayAssessment} />
+            <GroundRealityCard assessment={displayAssessment} onWatchToggle={() => setRefreshTrigger((p) => p + 1)} />
             {/* Live Inbound Visualizer */}
             <InboundVisualizer
               assessment={displayAssessment}
@@ -129,6 +168,18 @@ export const App: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* Watchlist Drawer */}
+      <WatchlistDrawer
+        isOpen={isWatchlistOpen}
+        onClose={() => {
+          setIsWatchlistOpen(false);
+          setRefreshTrigger((p) => p + 1);
+        }}
+        userName="Trupti"
+        onSelectFlight={(carrier, flightNum, date) => handleSearch(carrier, flightNum, date)}
+        refreshTrigger={refreshTrigger}
+      />
 
       {/* Footer */}
       <footer className="w-full max-w-md mx-auto text-center mt-8 text-[11px] text-slate-500 space-y-1">
