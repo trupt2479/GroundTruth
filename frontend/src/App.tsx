@@ -44,6 +44,13 @@ export const App: React.FC = () => {
         `${API_BASE_URL}/api/v1/flights/evaluate?carrier=${carrier}&flight_num=${flightNumber}&date=${date}`
       );
 
+      const contentType = resp.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error(
+          `Received non-JSON response from backend (${resp.status}). Ensure the backend is reachable.`
+        );
+      }
+
       if (!resp.ok) {
         const errorData = await resp.json().catch(() => ({}));
         throw new Error(errorData.detail || `Server returned ${resp.status}`);

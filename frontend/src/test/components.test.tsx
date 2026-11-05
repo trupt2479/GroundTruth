@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import { FlightSearch } from '../components/FlightSearch';
+import { FlightSearch, formatLocalDate } from '../components/FlightSearch';
 import { GroundRealityCard } from '../components/GroundRealityCard';
 import { useFlightStream, MAX_RECONNECT_ATTEMPTS } from '../hooks/useFlightStream';
 import { RealityAssessment } from '../types/flight';
@@ -64,6 +64,40 @@ describe('FlightSearch Component', () => {
     fireEvent.click(submitBtn);
 
     expect(onSearchMock).toHaveBeenCalledWith('AA', '1200', expect.any(String));
+  });
+
+  it('updates date to Today and Tomorrow when preset buttons are clicked', () => {
+    const onSearchMock = vi.fn();
+    render(<FlightSearch onSearch={onSearchMock} isLoading={false} />);
+
+    const dateInput = screen.getByLabelText(/date/i) as HTMLInputElement;
+    const todayBtn = screen.getByTestId('preset-today-btn');
+    const tomorrowBtn = screen.getByTestId('preset-tomorrow-btn');
+
+    const expectedToday = formatLocalDate(new Date());
+    const tomorrowDate = new Date();
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    const expectedTomorrow = formatLocalDate(tomorrowDate);
+
+    // Click Tomorrow
+    fireEvent.click(tomorrowBtn);
+    expect(dateInput.value).toBe(expectedTomorrow);
+
+    // Click Today
+    fireEvent.click(todayBtn);
+    expect(dateInput.value).toBe(expectedToday);
+  });
+
+  it('triggers showPicker on date input click if supported', () => {
+    const onSearchMock = vi.fn();
+    render(<FlightSearch onSearch={onSearchMock} isLoading={false} />);
+
+    const dateInput = screen.getByLabelText(/date/i) as HTMLInputElement;
+    const showPickerSpy = vi.fn();
+    dateInput.showPicker = showPickerSpy;
+
+    fireEvent.click(dateInput);
+    expect(showPickerSpy).toHaveBeenCalled();
   });
 });
 
