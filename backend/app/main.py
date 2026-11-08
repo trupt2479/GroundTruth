@@ -7,16 +7,26 @@ from fastapi.responses import JSONResponse
 
 from app.api.v1.endpoints import health
 from app.api.v1.router import api_router
+from contextlib import asynccontextmanager
 from app.core.config import settings, setup_logging
+from app.db.session import init_db
 
 setup_logging()
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url=f"{settings.API_V1_STR}/docs",
     redoc_url=f"{settings.API_V1_STR}/redoc",
+    lifespan=lifespan,
 )
 
 # CORS configuration explicitly allowing frontend development ports

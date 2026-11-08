@@ -92,6 +92,8 @@ export interface LiveTelemetry {
   latitude?: number;
   longitude?: number;
   last_contact_epoch?: number;
+  telemetry_phase?: 'ACTIVE_FLIGHT' | 'INBOUND_ROTATION';
+  inbound_callsign?: string;
 }
 
 export interface NotificationSubscription {
@@ -109,4 +111,22 @@ export interface NotificationResponse {
   status: string;
   message: string;
   subscription: NotificationSubscription;
+}
+
+export interface WatchlistItem {
+  id: string;
+  user_name: string;
+  carrier: string;
+  flight_number: string;
+  departure_date: string;
+  origin_iata: string;
+  destination_iata: string;
+  origin_name?: string | null;
+  destination_name?: string | null;
+  scheduled_departure?: string | null;
+  t2_scheduled_fetch?: string | null;
+  status: 'ARMED' | 'EVALUATED_T2' | 'DEPARTED' | string;
+  latest_assessment?: RealityAssessment | null;
+  created_at: string;
+  updated_at?: string | null;
 }
