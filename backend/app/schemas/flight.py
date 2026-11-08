@@ -45,6 +45,14 @@ class FlightQuery(BaseModel):
         ...,
         description="Departure date in YYYY-MM-DD format",
     )
+    origin: Optional[str] = Field(
+        default=None,
+        description="Optional 3-letter IATA origin airport code to disambiguate multi-leg flights (e.g., 'LAX')",
+    )
+    destination: Optional[str] = Field(
+        default=None,
+        description="Optional 3-letter IATA destination airport code to disambiguate multi-leg flights (e.g., 'ATL')",
+    )
 
 
 class AircraftInfo(BaseModel):
@@ -117,6 +125,10 @@ class InboundTurnaround(BaseModel):
     earliest_possible_departure: datetime = Field(
         ...,
         description="Earliest possible departure time calculated from estimated_touchdown + mtt_minutes",
+    )
+    live_telemetry: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Inbound aircraft live transponder state vector",
     )
 
 

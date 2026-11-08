@@ -88,7 +88,41 @@ class AeroDataBoxClient:
         fn = (flight_num or "").strip()
         t_date = target_date or "2026-10-24"
 
-        if c == "DL" and fn == "450":
+        if c == "DL" and fn == "783":
+            # Booked Flight: DL 783 (LAX -> ATL)
+            data["number"] = "DL783"
+            data["callsign"] = "DAL783"
+            data["status"] = "Active"
+            if "departure" in data:
+                data["departure"]["airport"] = {
+                    "iata": "LAX",
+                    "icao": "KLAX",
+                    "name": "Los Angeles International Airport",
+                }
+                data["departure"]["scheduledTime"] = {"utc": f"{t_date} 13:00Z"}
+                data["departure"]["revisedTime"] = {"utc": f"{t_date} 13:00Z"}
+                data["departure"]["actualTime"] = {"utc": f"{t_date} 13:10Z"}
+            if "movement" in data:
+                data["movement"]["airport"] = {
+                    "iata": "LAX",
+                    "icao": "KLAX",
+                    "name": "Los Angeles International Airport",
+                }
+                data["movement"]["scheduledTime"] = {"utc": f"{t_date} 13:00Z"}
+                data["movement"]["revisedTime"] = {"utc": f"{t_date} 13:00Z"}
+            if "arrival" in data:
+                data["arrival"]["airport"] = {
+                    "iata": "ATL",
+                    "icao": "KATL",
+                    "name": "Hartsfield-Jackson Atlanta International Airport",
+                }
+                data["arrival"]["scheduledTime"] = {"utc": f"{t_date} 18:30Z"}
+                data["arrival"]["revisedTime"] = {"utc": f"{t_date} 18:30Z"}
+            if "aircraft" in data:
+                data["aircraft"]["reg"] = "N596NW"
+                data["aircraft"]["typeCode"] = "B752"
+
+        elif c == "DL" and fn == "450":
             # Scenario 2: DL 450 (Hub Spare Available / Low Risk Turnaround at Fortress Hub ATL)
             data["number"] = "DL450"
             data["callsign"] = "DAL450"
@@ -194,6 +228,20 @@ class AeroDataBoxClient:
                     status="LANDED",
                 )
             ]
+        elif tail == "N596NW":
+            # DL 656 from ATL to SFO (preceding leg for airframe N596NW)
+            return [
+                FlightLeg(
+                    flight_number="DL656",
+                    origin_iata="ATL",
+                    destination_iata="SFO",
+                    scheduled_departure=datetime.fromisoformat(f"{t_date}T08:00:00+00:00"),
+                    scheduled_arrival=datetime.fromisoformat(f"{t_date}T10:45:00+00:00"),
+                    actual_departure=datetime.fromisoformat(f"{t_date}T08:15:00+00:00"),
+                    actual_arrival=datetime.fromisoformat(f"{t_date}T11:00:00+00:00"),
+                    status="LANDED",
+                )
+            ]
         elif tail == "N1200A":
             # Outstation delay trap: inbound arrives at 15:45Z (45m after scheduled departure 15:00Z)
             return [
@@ -212,7 +260,12 @@ class AeroDataBoxClient:
         return legs[-2:]
 
     async def get_flight_status(
-        self, carrier: str, flight_num: str, date: str
+        self,
+        carrier: str,
+        flight_num: str,
+        date: str,
+        origin: Optional[str] = None,
+        destination: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Fetch raw flight status payload.
 
@@ -252,7 +305,27 @@ class AeroDataBoxClient:
                 response.raise_for_status()
                 data = response.json()
                 if isinstance(data, list):
-                    return data[0] if data else {}
+                    if not data:
+                        return {}
+                    if origin or destination:
+                        for item in data:
+                            dep_iata = (
+                                item.get("departure", {}).get("airport", {}).get("iata")
+                                or item.get("movement", {}).get("airport", {}).get("iata")
+                                or ""
+                            ).upper()
+                            arr_iata = (
+                                item.get("arrival", {}).get("airport", {}).get("iata")
+                                or ""
+                            ).upper()
+                            if origin and destination:
+                                if dep_iata == origin.upper() and arr_iata == destination.upper():
+                                    return item
+                            elif origin and dep_iata == origin.upper():
+                                return item
+                            elif destination and arr_iata == destination.upper():
+                                return item
+                    return data[0]
                 return data or {}
             except httpx.HTTPStatusError as exc:
                 if exc.response.status_code == 404:
