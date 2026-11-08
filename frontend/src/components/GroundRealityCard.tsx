@@ -12,14 +12,21 @@ import {
   Check,
   UserX,
   Bell,
+  Star,
 } from 'lucide-react';
 import { NotificationModal } from './NotificationModal';
 
 interface GroundRealityCardProps {
   assessment: RealityAssessment;
+  isWatched?: boolean;
+  onWatchToggle?: () => void;
 }
 
-export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({ assessment }) => {
+export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({
+  assessment,
+  isWatched: propsIsWatched,
+  onWatchToggle,
+}) => {
   const {
     flight_query,
     origin_iata,
@@ -43,6 +50,42 @@ export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({ assessment
 
   const [copiedFlight, setCopiedFlight] = useState<string | null>(null);
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
+  const [isWatchedInternal, setIsWatchedInternal] = useState(false);
+  const [isWatchLoading, setIsWatchLoading] = useState(false);
+  const [watchMessage, setWatchMessage] = useState<string | null>(null);
+
+  const isWatched = propsIsWatched ?? isWatchedInternal;
+
+  const handleWatchFlight = async () => {
+    setIsWatchLoading(true);
+    setWatchMessage(null);
+    try {
+      const resp = await fetch('/api/v1/watchlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_name: 'Trupti',
+          carrier: flight_query.carrier,
+          flight_number: flight_query.flight_number,
+          departure_date: flight_query.departure_date,
+        }),
+      });
+
+      if (resp.status === 201 || resp.status === 409) {
+        setIsWatchedInternal(true);
+        setWatchMessage(resp.status === 409 ? 'Already in Watchlist' : 'Saved to Watchlist');
+        onWatchToggle?.();
+      } else {
+        const errData = await resp.json().catch(() => null);
+        throw new Error(errData?.detail || 'Failed to watch flight');
+      }
+    } catch (err) {
+      setWatchMessage(err instanceof Error ? err.message : 'Error adding to watchlist');
+    } finally {
+      setIsWatchLoading(false);
+      setTimeout(() => setWatchMessage(null), 3000);
+    }
+  };
 
   const handleCopy = (flightNum: string) => {
     navigator.clipboard?.writeText(flightNum);
@@ -177,15 +220,39 @@ export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({ assessment
         </div>
       </div>
 
-      {/* Proactive Push Alert Trigger Button */}
-      <button
-        type="button"
-        onClick={() => setIsAlertModalOpen(true)}
-        className="w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-indigo-600/15 hover:bg-indigo-600/25 text-indigo-300 border border-indigo-500/30 transition shadow-sm cursor-pointer"
-      >
-        <Bell className="w-4 h-4 text-indigo-400" />
-        <span>Get Real-Time Alerts</span>
-      </button>
+      {/* Actions: Watch Flight & Get Real-Time Alerts */}
+      <div className="space-y-1.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            onClick={handleWatchFlight}
+            disabled={isWatchLoading || isWatched}
+            data-testid="watch-flight-btn"
+            className={`py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 border transition shadow-sm cursor-pointer ${
+              isWatched
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 cursor-default'
+                : 'bg-slate-800/80 hover:bg-slate-700 text-slate-200 border-slate-700'
+            }`}
+          >
+            <Star className={`w-4 h-4 ${isWatched ? 'text-amber-400 fill-amber-400' : 'text-slate-400'}`} />
+            <span>{isWatched ? '✓ Watching' : '⭐ Watch Flight'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsAlertModalOpen(true)}
+            className="py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-indigo-600/15 hover:bg-indigo-600/25 text-indigo-300 border border-indigo-500/30 transition shadow-sm cursor-pointer"
+          >
+            <Bell className="w-4 h-4 text-indigo-400" />
+            <span>Get Real-Time Alerts</span>
+          </button>
+        </div>
+        {watchMessage && (
+          <p className="text-[11px] text-center font-mono text-amber-300/90 animate-fadeIn">
+            {watchMessage}
+          </p>
+        )}
+      </div>
 
       {/* Airspace Advisory Alert Banner (FAA NAS Ground Stop / GDP / Deicing) */}
       {airspace_advisory && airspace_advisory.advisory_active && (

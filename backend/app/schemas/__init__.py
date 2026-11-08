@@ -13,6 +13,10 @@ from app.schemas.notification import (
     NotificationResponse,
     NotificationSubscription,
 )
+from app.schemas.watchlist import (
+    WatchlistCreate,
+    WatchlistResponse,
+)
 
 __all__ = [
     "AircraftInfo",
@@ -26,4 +30,6 @@ __all__ = [
     "SwapHeuristic",
     "NotificationSubscription",
     "NotificationResponse",
+    "WatchlistCreate",
+    "WatchlistResponse",
 ]
