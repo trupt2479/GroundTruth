@@ -1,6 +1,6 @@
 from datetime import date
 import logging
-from typing import Annotated
+from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import ValidationError
 
@@ -60,6 +60,20 @@ async def evaluate_flight(
             examples=["2026-10-24"],
         ),
     ],
+    origin: Annotated[
+        Optional[str],
+        Query(
+            description="Optional 3-letter IATA origin airport code to disambiguate multi-leg hops (e.g. 'LAX')",
+            examples=["LAX"],
+        ),
+    ] = None,
+    destination: Annotated[
+        Optional[str],
+        Query(
+            description="Optional 3-letter IATA destination airport code to disambiguate multi-leg hops (e.g. 'ATL')",
+            examples=["ATL"],
+        ),
+    ] = None,
     aggregator: FlightAggregator = Depends(get_flight_aggregator),
     engine: PredictionEngine = Depends(get_prediction_engine),
     faa_client: FaaNasClient = Depends(get_faa_nas_client),
@@ -67,9 +81,11 @@ async def evaluate_flight(
     """Validate query, aggregate live context, correlate FAA airspace programs, scout alternative flights, and produce a RealityAssessment."""
     try:
         flight_query = FlightQuery(
-            carrier=carrier,
-            flight_number=flight_num,
+            carrier=carrier.strip(),
+            flight_number=flight_num.strip(),
             departure_date=date.fromisoformat(date_str),
+            origin=origin.strip().upper() if origin else None,
+            destination=destination.strip().upper() if destination else None,
         )
     except (ValidationError, ValueError) as exc:
         raise HTTPException(

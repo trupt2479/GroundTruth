@@ -2,7 +2,7 @@ import asyncio
 from datetime import date
 import json
 import logging
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
@@ -123,14 +123,18 @@ async def stream_flight_assessment(
     flight_num: str,
     date_str: str,
     request: Request,
+    origin: Optional[str] = None,
+    destination: Optional[str] = None,
     aggregator: FlightAggregator = Depends(get_flight_aggregator),
     engine: PredictionEngine = Depends(get_prediction_engine),
 ):
     try:
         flight_query = FlightQuery(
-            carrier=carrier,
-            flight_number=flight_num,
+            carrier=carrier.strip(),
+            flight_number=flight_num.strip(),
             departure_date=date.fromisoformat(date_str),
+            origin=origin.strip().upper() if origin else None,
+            destination=destination.strip().upper() if destination else None,
         )
     except (ValidationError, ValueError) as exc:
         raise HTTPException(

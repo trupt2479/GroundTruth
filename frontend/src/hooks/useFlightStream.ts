@@ -16,6 +16,8 @@ export function useFlightStream(
   carrier: string | null,
   flightNum: string | null,
   date: string | null,
+  origin?: string | null,
+  destination?: string | null,
   scanTrigger?: number
 ): UseFlightStreamResult {
   const [assessment, setAssessment] = useState<RealityAssessment | null>(null);
@@ -37,7 +39,14 @@ export function useFlightStream(
       eventSourceRef.current = null;
     }
 
-    const streamUrl = `${API_BASE_URL}/api/v1/flights/${carrier.toUpperCase()}/${flightNum}/${date}/stream`;
+    let streamUrl = `${API_BASE_URL}/api/v1/flights/${carrier.toUpperCase()}/${flightNum}/${date}/stream`;
+    const params = new URLSearchParams();
+    if (origin) params.set('origin', origin);
+    if (destination) params.set('destination', destination);
+    const qs = params.toString();
+    if (qs) {
+      streamUrl += `?${qs}`;
+    }
     const es = new EventSource(streamUrl);
     eventSourceRef.current = es;
 
@@ -80,7 +89,7 @@ export function useFlightStream(
       setIsReconnecting(false);
       setError('Live stream disconnected. Scan again to reconnect.');
     };
-  }, [carrier, flightNum, date]);
+  }, [carrier, flightNum, date, origin, destination]);
 
   useEffect(() => {
     connect();
