@@ -92,6 +92,8 @@ export interface LiveTelemetry {
   latitude?: number;
   longitude?: number;
   last_contact_epoch?: number;
+  telemetry_phase?: 'ACTIVE_FLIGHT' | 'INBOUND_ROTATION';
+  inbound_callsign?: string;
 }
 
 export interface NotificationSubscription {
