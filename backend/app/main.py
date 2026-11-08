@@ -7,9 +7,11 @@ from fastapi.responses import JSONResponse
 
 from app.api.v1.endpoints import health
 from app.api.v1.router import api_router
+import asyncio
 from contextlib import asynccontextmanager
 from app.core.config import settings, setup_logging
 from app.db.session import init_db
+from app.services.watchlist_scheduler import start_watchlist_scheduler
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -18,7 +20,16 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    yield
+    scheduler_task = asyncio.create_task(start_watchlist_scheduler())
+    app.state.scheduler_task = scheduler_task
+    try:
+        yield
+    finally:
+        scheduler_task.cancel()
+        try:
+            await scheduler_task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(

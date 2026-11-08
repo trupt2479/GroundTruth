@@ -14,7 +14,9 @@ from app.schemas.watchlist import (
 )
 from app.services.faa_nas_client import FaaNasClient
 from app.services.flight_aggregator import FlightAggregator
+from app.services.notification_service import NotificationService
 from app.services.prediction_engine import PredictionEngine
+from app.services.watchlist_scheduler import run_milestone_check
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +33,10 @@ def get_prediction_engine() -> PredictionEngine:
 
 def get_faa_nas_client() -> FaaNasClient:
     return FaaNasClient()
+
+
+def get_notification_service() -> NotificationService:
+    return NotificationService()
 
 
 @router.post("/", response_model=WatchlistResponse, status_code=status.HTTP_201_CREATED)
@@ -168,64 +174,20 @@ async def check_milestones(
     aggregator: FlightAggregator = Depends(get_flight_aggregator),
     engine: PredictionEngine = Depends(get_prediction_engine),
     faa_client: FaaNasClient = Depends(get_faa_nas_client),
+    notification_service: NotificationService = Depends(get_notification_service),
 ):
     """Scan and evaluate flights that reached their T-2h milestone."""
-    now = datetime.now(timezone.utc)
-    candidates = (
-        db.query(WatchlistItem)
-        .filter(
-            WatchlistItem.status == "ARMED",
-            WatchlistItem.t2_scheduled_fetch <= now,
-        )
-        .all()
+    evaluated_count, items_evaluated, alerts_dispatched, evaluated_items = await run_milestone_check(
+        db=db,
+        aggregator=aggregator,
+        engine=engine,
+        faa_client=faa_client,
+        notification_service=notification_service,
     )
-
-    evaluated_items = []
-    for item in candidates:
-        try:
-            q = FlightQuery(
-                carrier=item.carrier,
-                flight_number=item.flight_number,
-                departure_date=date.fromisoformat(item.departure_date),
-            )
-            current_leg, turnaround, telemetry = await aggregator.get_flight_context(q)
-            if current_leg:
-                advisory = None
-                try:
-                    adv_data = await faa_client.get_airport_airspace_status(current_leg.origin_iata)
-                    if adv_data and adv_data.get("advisory_active"):
-                        advisory = AirspaceAdvisory(
-                            airport_iata=adv_data["airport_iata"],
-                            program_type=adv_data["status_type"],
-                            reason=adv_data.get("reason"),
-                            avg_delay_minutes=adv_data.get("avg_delay_minutes", 0),
-                            advisory_active=True,
-                        )
-                except Exception:
-                    pass
-
-                assessment = await engine.assess_flight_async(
-                    current_leg=current_leg,
-                    turnaround=turnaround,
-                    flight_query=q,
-                    airspace_advisory=advisory,
-                    live_telemetry=telemetry,
-                )
-
-                item.latest_assessment = assessment.model_dump(mode="json")
-                item.status = "EVALUATED_T2"
-                item.updated_at = datetime.now(timezone.utc)
-                db.add(item)
-                evaluated_items.append(item)
-        except Exception as exc:
-            logger.error("Failed to check milestone for watchlist item %s: %s", item.id, exc)
-
-    db.commit()
-    for it in evaluated_items:
-        db.refresh(it)
-
     return MilestoneCheckResponse(
-        checked_count=len(candidates),
-        evaluated_count=len(evaluated_items),
+        checked_count=evaluated_count,
+        evaluated_count=evaluated_count,
+        items_evaluated=items_evaluated,
+        alerts_dispatched=alerts_dispatched,
         items=evaluated_items,
     )

@@ -531,4 +531,87 @@ describe('Watchlist Features (GT-WATCH-01)', () => {
 
     vi.unstubAllGlobals();
   });
+  it('renders status badges for ARMED, EVALUATED_T2, DEPARTED and triggers Check Now manual milestone check', async () => {
+    const mockItems = [
+      {
+        id: 'item-armed',
+        user_name: 'Trupti',
+        carrier: 'DL',
+        flight_number: '100',
+        departure_date: '2026-11-08',
+        origin_iata: 'ATL',
+        destination_iata: 'MCO',
+        scheduled_departure: '2026-11-08T18:00:00Z',
+        t2_scheduled_fetch: '2026-11-08T16:00:00Z',
+        status: 'ARMED',
+        created_at: '2026-11-08T00:00:00Z',
+      },
+      {
+        id: 'item-evaluated',
+        user_name: 'Trupti',
+        carrier: 'UA',
+        flight_number: '200',
+        departure_date: '2026-11-08',
+        origin_iata: 'ORD',
+        destination_iata: 'EWR',
+        scheduled_departure: '2026-11-08T14:00:00Z',
+        t2_scheduled_fetch: '2026-11-08T12:00:00Z',
+        status: 'EVALUATED_T2',
+        latest_assessment: {
+          delay_lead_time_minutes: 45,
+          rebooking_directive: 'EXPEDITE_REBOOKING',
+        },
+        created_at: '2026-11-08T00:00:00Z',
+      },
+      {
+        id: 'item-departed',
+        user_name: 'Trupti',
+        carrier: 'AA',
+        flight_number: '300',
+        departure_date: '2026-11-08',
+        origin_iata: 'DFW',
+        destination_iata: 'MIA',
+        scheduled_departure: '2026-11-08T10:00:00Z',
+        t2_scheduled_fetch: '2026-11-08T08:00:00Z',
+        status: 'DEPARTED',
+        created_at: '2026-11-08T00:00:00Z',
+      },
+    ];
+
+    const fetchMock = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
+      if (options?.method === 'POST' && url.includes('check-milestones')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ evaluated_count: 1, items_evaluated: ['DL 100'], alerts_dispatched: 0 }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => mockItems,
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<WatchlistDrawer isOpen={true} onClose={vi.fn()} />);
+
+    expect(await screen.findByText(/DL 100/i)).toBeInTheDocument();
+    expect(screen.getByTestId('status-badge-armed')).toBeInTheDocument();
+    expect(screen.getByTestId('status-badge-evaluated')).toBeInTheDocument();
+    expect(screen.getByTestId('status-badge-departed')).toBeInTheDocument();
+    expect(screen.getByText(/Departed/i)).toBeInTheDocument();
+    expect(screen.getByText(/T-2h Checked/i)).toBeInTheDocument();
+    expect(screen.getByText('EXPEDITE_REBOOKING')).toBeInTheDocument();
+
+    const checkNowBtn = screen.getByTestId('check-milestones-btn');
+    expect(checkNowBtn).toHaveTextContent(/check now/i);
+
+    await act(async () => {
+      fireEvent.click(checkNowBtn);
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/watchlist/check-milestones', { method: 'POST' });
+
+    vi.unstubAllGlobals();
+  });
 });
+
