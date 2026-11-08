@@ -32,6 +32,8 @@ class WatchlistResponse(BaseModel):
 
 
 class MilestoneCheckResponse(BaseModel):
-    checked_count: int
     evaluated_count: int
-    items: list[WatchlistResponse]
+    items_evaluated: list[str] = Field(default_factory=list)
+    alerts_dispatched: int = 0
+    checked_count: Optional[int] = None
+    items: list[WatchlistResponse] = Field(default_factory=list)

@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     OPENSKY_CLIENT_ID: Optional[str] = None
     OPENSKY_CLIENT_SECRET: Optional[str] = None
 
+    # Watchlist Background Monitoring
+    WATCHLIST_POLL_INTERVAL_SECONDS: int = 60
+
     # FAA NAS Status Service (Airspace & Ground Stops)
     FAA_NAS_API_URL: str = "https://nasstatus.faa.gov/api/airport-status-information"
 

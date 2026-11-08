@@ -72,6 +72,19 @@ export const WatchlistDrawer: React.FC<WatchlistDrawerProps> = ({
     }
   };
 
+  const getArmedCountdown = (t2Str?: string | null) => {
+    if (!t2Str) return 'Armed for T-2h check';
+    try {
+      const t2Time = new Date(t2Str).getTime();
+      const now = Date.now();
+      const diffMins = Math.round((t2Time - now) / 60000);
+      if (diffMins <= 0) return 'Armed for T-2h check (Due)';
+      return `Checking in ${diffMins} minutes (T-2h window)`;
+    } catch {
+      return 'Armed for T-2h check';
+    }
+  };
+
   const formatTime = (isoString?: string | null) => {
     if (!isoString) return '--:--';
     try {
@@ -138,7 +151,7 @@ export const WatchlistDrawer: React.FC<WatchlistDrawerProps> = ({
               className="px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isCheckingMilestones ? 'animate-spin' : ''}`} />
-              <span>{isCheckingMilestones ? 'Checking...' : 'Check Due'}</span>
+              <span>{isCheckingMilestones ? 'Checking...' : 'Check Now'}</span>
             </button>
           </div>
 
@@ -212,21 +225,30 @@ export const WatchlistDrawer: React.FC<WatchlistDrawerProps> = ({
 
                     {/* Status Badge */}
                     <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800/60">
-                      <div className="flex items-center gap-1.5">
-                        {isArmed ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                            <Clock className="w-3 h-3" />
-                            <span>Armed for T-2h check</span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {item.status === 'DEPARTED' ? (
+                          <span data-testid="status-badge-departed" className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                            <span>Departed</span>
                           </span>
-                        ) : leadDelay > 0 ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30">
-                            <AlertTriangle className="w-3 h-3" />
-                            <span>Evaluated (+{leadDelay}m delay)</span>
+                        ) : isArmed ? (
+                          <span data-testid="status-badge-armed" className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                            <Clock className="w-3 h-3" />
+                            <span>{getArmedCountdown(item.t2_scheduled_fetch)}</span>
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                            <ShieldCheck className="w-3 h-3" />
-                            <span>Evaluated (On Time)</span>
+                          <span data-testid="status-badge-evaluated" className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${
+                            leadDelay > 0
+                              ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
+                              : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                          }`}>
+                            {leadDelay > 0 ? <AlertTriangle className="w-3 h-3" /> : <ShieldCheck className="w-3 h-3" />}
+                            <span>T-2h Checked ({leadDelay > 0 ? `+${leadDelay}m early warning` : 'On Time'})</span>
+                          </span>
+                        )}
+
+                        {item.latest_assessment?.rebooking_directive && (
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800/80 text-slate-300 border border-slate-700/60">
+                            {item.latest_assessment.rebooking_directive}
                           </span>
                         )}
                       </div>
