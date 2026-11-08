@@ -26,7 +26,7 @@ export const InboundVisualizer: React.FC<InboundVisualizerProps> = (props) => {
       <div data-testid="no-turnaround-container" className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-3">
         <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold uppercase tracking-wider">
           <PlaneTakeoff className="w-4 h-4 text-indigo-400" />
-          <span>Inbound Turnaround Reality</span>
+          <span>Incoming Aircraft (Turnaround Check)</span>
         </div>
         <div className="bg-slate-950/40 border border-slate-800/70 rounded-xl p-3 text-xs text-slate-400">
           <p className="leading-relaxed">
@@ -49,7 +49,7 @@ export const InboundVisualizer: React.FC<InboundVisualizerProps> = (props) => {
         <div className="flex items-center gap-2.5">
           <PlaneTakeoff className="w-5 h-5 text-indigo-400" />
           <div>
-            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Assigned Tail</span>
+            <span className="text-[10px] font-semibold text-indigo-400 uppercase tracking-widest">Incoming Aircraft (Turnaround Check)</span>
             <div className="flex items-center gap-2">
               <span className="text-base font-bold font-mono text-white">{assigned_aircraft.tail_number}</span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-medium">
@@ -73,10 +73,15 @@ export const InboundVisualizer: React.FC<InboundVisualizerProps> = (props) => {
           className="bg-slate-950/70 border border-slate-800 rounded-xl p-3 grid grid-cols-3 gap-2 text-center"
         >
           <div>
-            <span className="text-[10px] text-slate-500 uppercase font-semibold">Live State</span>
+            <span className="text-[10px] text-slate-500 uppercase font-semibold">
+              {liveTelemetry.telemetry_phase === 'INBOUND_ROTATION' ? 'Incoming Plane' : 'Live State'}
+            </span>
             <div className="text-xs font-bold text-slate-200 mt-0.5 flex items-center justify-center gap-1">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Airborne</span>
+              <span>{liveTelemetry.telemetry_phase === 'INBOUND_ROTATION' ? 'Inbound' : 'Airborne'}</span>
+              {liveTelemetry.callsign && (
+                <span className="text-[11px] font-mono text-slate-400 font-normal">({liveTelemetry.callsign.trim()})</span>
+              )}
             </div>
           </div>
           <div>

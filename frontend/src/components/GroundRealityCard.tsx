@@ -138,7 +138,7 @@ export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({
       {/* Flight Header */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-4">
         <div>
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Target Flight</span>
+          <span className="text-xs font-semibold text-blue-400 uppercase tracking-widest">Your Flight (Booked)</span>
           <h3 className="text-2xl font-black text-white tracking-tight flex items-center gap-2 flex-wrap">
             <span>{flight_query.carrier} {flight_query.flight_number}</span>
             {origin_iata && destination_iata && (

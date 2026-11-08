@@ -28,6 +28,17 @@ MTT_MAP = {
     "WIDEBODY": 75,
 }
 
+CARRIER_ICAO_MAP = {
+    "DL": "DAL",
+    "UA": "UAL",
+    "AA": "AAL",
+    "WN": "SWA",
+    "B6": "JBU",
+    "AS": "ASA",
+    "NK": "NKS",
+    "F9": "FFT",
+}
+
 
 def categorize_aircraft(type_code: str) -> str:
     """Classify aircraft ICAO type code into REGIONAL, NARROWBODY, or WIDEBODY."""
@@ -211,13 +222,37 @@ class FlightAggregator:
                 date=str(query.departure_date),
             )
 
-        # 4. Live telemetry via OpenSky
-        callsign = flight_raw.get("callsign") or f"{query.carrier}{query.flight_number}"
-        telemetry_target = mode_s or (callsign if not self.aerodatabox.mock_mode else None)
-        if telemetry_target:
+        # 4. Live telemetry via OpenSky (Prioritize user's booked flight)
+        raw_callsign = flight_raw.get("callsign")
+        carrier_upper = query.carrier.upper()
+        icao_prefix = CARRIER_ICAO_MAP.get(carrier_upper, carrier_upper)
+        active_callsign = raw_callsign or f"{icao_prefix}{query.flight_number}"
+
+        live_telemetry = None
+        if self.opensky.mock_mode:
+            telemetry_target = mode_s or active_callsign
             live_telemetry = await self.opensky.get_aircraft_state(telemetry_target)
+            if live_telemetry:
+                live_telemetry["telemetry_phase"] = "ACTIVE_FLIGHT"
         else:
-            live_telemetry = None
+            # 4a. Check if the user's booked flight is currently active/airborne in OpenSky
+            active_state = await self.opensky.get_aircraft_state(active_callsign)
+            if (
+                active_state
+                and not active_state.get("on_ground")
+                and active_state.get("baro_altitude_ft") is not None
+            ):
+                active_state["telemetry_phase"] = "ACTIVE_FLIGHT"
+                live_telemetry = active_state
+            elif mode_s:
+                # 4b. Booked flight not airborne; track inbound aircraft's rotation as background check
+                inbound_state = await self.opensky.get_aircraft_state(mode_s)
+                if inbound_state:
+                    inbound_state["telemetry_phase"] = "INBOUND_ROTATION"
+                    inbound_state["inbound_callsign"] = inbound_state.get("callsign")
+                    live_telemetry = inbound_state
+            else:
+                live_telemetry = active_state or None
 
         # Write live telemetry to Redis with 60s TTL
         if live_telemetry:
