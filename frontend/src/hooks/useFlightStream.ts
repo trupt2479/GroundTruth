@@ -80,6 +80,26 @@ export function useFlightStream(
       setLastTickTime(Date.now());
     });
 
+    const handleErrorEvent = (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data?.error) {
+          setError(data.error);
+        } else if (data?.detail) {
+          setError(data.detail);
+        } else if (typeof data === 'string') {
+          setError(data);
+        }
+      } catch {
+        if (e.data) {
+          setError(e.data);
+        }
+      }
+    };
+
+    es.addEventListener('error', handleErrorEvent);
+    es.addEventListener('ERROR', handleErrorEvent);
+
     es.onerror = () => {
       // Zero-Auto-Retry: strictly manual-only.
       // Immediately close connection, do NOT initiate any setTimeout reconnections.
@@ -87,7 +107,7 @@ export function useFlightStream(
       eventSourceRef.current = null;
       setIsConnected(false);
       setIsReconnecting(false);
-      setError('Live stream disconnected. Scan again to reconnect.');
+      setError((prev) => prev || 'Live stream disconnected. Scan again to reconnect.');
     };
   }, [carrier, flightNum, date, origin, destination]);
 

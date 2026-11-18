@@ -291,9 +291,6 @@ class AeroDataBoxClient:
             try:
                 response = await client.get(url, headers=headers)
                 logger.info("AeroDataBoxClient: [LIVE INGESTION] Response received with status %s", response.status_code)
-                if response.status_code == 404:
-                    logger.warning("AeroDataBox returned 404 for %s%s on %s", carrier, flight_num, date)
-                    return {}
                 if response.status_code == 429:
                     raise AeroDataBoxRateLimitError(
                         "Rate limit exceeded (HTTP 429) for AeroDataBox API."
@@ -302,8 +299,15 @@ class AeroDataBoxClient:
                     raise AeroDataBoxServiceUnavailableError(
                         "AeroDataBox service temporarily unavailable (HTTP 503)."
                     )
+                if response.status_code in (204, 404) or not response.content:
+                    logger.warning("AeroDataBox returned %s (or empty content) for %s%s on %s", response.status_code, carrier, flight_num, date)
+                    return {}
                 response.raise_for_status()
-                data = response.json()
+                try:
+                    data = response.json()
+                except Exception:
+                    logger.warning("AeroDataBox returned non-JSON content for %s%s on %s", carrier, flight_num, date)
+                    return {}
                 if isinstance(data, list):
                     if not data:
                         return {}
@@ -328,7 +332,7 @@ class AeroDataBoxClient:
                     return data[0]
                 return data or {}
             except httpx.HTTPStatusError as exc:
-                if exc.response.status_code == 404:
+                if exc.response.status_code in (204, 404) or not exc.response.content:
                     return {}
                 if exc.response.status_code == 429:
                     raise AeroDataBoxRateLimitError(str(exc)) from exc
@@ -365,15 +369,19 @@ class AeroDataBoxClient:
             try:
                 response = await client.get(url, headers=headers)
                 logger.info("AeroDataBoxClient: [LIVE INGESTION] Rotation response received with status %s", response.status_code)
-                if response.status_code == 404:
-                    logger.warning("AeroDataBox rotations returned 404 for tail %s on %s", tail_number, date)
-                    return []
                 if response.status_code == 429:
                     raise AeroDataBoxRateLimitError("Rate limit exceeded (HTTP 429)")
                 if response.status_code == 503:
                     raise AeroDataBoxServiceUnavailableError("Service unavailable (HTTP 503)")
+                if response.status_code in (204, 404) or not response.content:
+                    logger.warning("AeroDataBox rotations returned %s (or empty content) for tail %s on %s", response.status_code, tail_number, date)
+                    return []
                 response.raise_for_status()
-                raw_legs = response.json()
+                try:
+                    raw_legs = response.json()
+                except Exception:
+                    logger.warning("AeroDataBox rotations returned non-JSON content for tail %s on %s", tail_number, date)
+                    return []
                 if not isinstance(raw_legs, list) or not raw_legs:
                     return []
 
@@ -439,7 +447,7 @@ class AeroDataBoxClient:
                         )
                 return parsed_legs[-2:]
             except httpx.HTTPStatusError as exc:
-                if exc.response.status_code == 404:
+                if exc.response.status_code in (204, 404) or not exc.response.content:
                     return []
                 if exc.response.status_code == 429:
                     raise AeroDataBoxRateLimitError(str(exc)) from exc

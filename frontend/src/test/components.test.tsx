@@ -139,6 +139,39 @@ describe('useFlightStream Hook Zero-Auto-Retry', () => {
 
     vi.unstubAllGlobals();
   });
+
+  it('captures custom server error event with flight not found detail and sets error state', () => {
+    const listeners: Record<string, (e: any) => void> = {};
+
+    class MockEventSourceWithError {
+      close = vi.fn();
+      addEventListener = vi.fn((event: string, handler: (e: any) => void) => {
+        listeners[event] = handler;
+      });
+      onerror = vi.fn();
+      onopen = vi.fn();
+    }
+
+    vi.stubGlobal('EventSource', MockEventSourceWithError);
+
+    const { result } = renderHook(() =>
+      useFlightStream('WA', '4772', '2026-11-17')
+    );
+
+    act(() => {
+      if (listeners['error']) {
+        listeners['error']({
+          data: JSON.stringify({
+            error: 'No scheduled flight found for WA 4772 on 2026-11-17. Verify the airline IATA code.',
+          }),
+        });
+      }
+    });
+
+    expect(result.current.error).toContain('No scheduled flight found for WA 4772 on 2026-11-17');
+
+    vi.unstubAllGlobals();
+  });
 });
 
 const mockAssessmentDelay: RealityAssessment = {
