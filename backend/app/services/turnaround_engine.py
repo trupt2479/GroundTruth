@@ -1,6 +1,13 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import NamedTuple
 from app.schemas.flight import AircraftInfo
+
+
+def _ensure_utc(dt: datetime) -> datetime:
+    """Ensure datetime carries timezone.utc for safe epoch math."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 class TurnaroundResult(NamedTuple):
@@ -40,16 +47,18 @@ class TurnaroundEngine:
           Delay Lead Time Delta = (Earliest Possible Departure - Scheduled Departure)
         """
         mtt_minutes = self.get_mtt_minutes(aircraft.category)
-        earliest_possible_departure = inbound_touchdown + timedelta(
+        inbound_utc = _ensure_utc(inbound_touchdown)
+        sched_dep_utc = _ensure_utc(scheduled_departure)
+        earliest_possible_departure = inbound_utc + timedelta(
             minutes=mtt_minutes
         )
 
         delay_delta_seconds = (
-            earliest_possible_departure - scheduled_departure
+            earliest_possible_departure - sched_dep_utc
         ).total_seconds()
         delay_lead_time_minutes = int(delay_delta_seconds // 60)
 
-        is_unavoidable_delay = earliest_possible_departure > scheduled_departure
+        is_unavoidable_delay = earliest_possible_departure > sched_dep_utc
 
         return TurnaroundResult(
             mtt_minutes=mtt_minutes,
