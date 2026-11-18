@@ -10,6 +10,7 @@ from app.schemas.flight import (
     InboundTurnaround,
     RealityAssessment,
 )
+from app.services.airport_timezones import get_airport_timezone, to_local_iso
 from app.services.action_engine import ActionEngine
 from app.services.crew_duty_watchdog import CrewDutyWatchdog
 from app.services.flight_scout import AlternativeFlightScout
@@ -164,6 +165,9 @@ class PredictionEngine:
             current_leg.actual_departure or current_leg.scheduled_departure
         )
 
+        origin_tz = get_airport_timezone(current_leg.origin_iata)
+        destination_tz = get_airport_timezone(current_leg.destination_iata)
+
         return RealityAssessment(
             flight_query=flight_query,
             origin_iata=current_leg.origin_iata,
@@ -185,4 +189,10 @@ class PredictionEngine:
             crew_duty=crew_duty,
             inbound_turnaround=turnaround,
             live_telemetry=live_telemetry,
+            origin_tz=origin_tz,
+            destination_tz=destination_tz,
+            scheduled_departure_local=to_local_iso(current_leg.scheduled_departure, origin_tz),
+            actual_departure_local=to_local_iso(current_leg.actual_departure, origin_tz),
+            scheduled_arrival_local=to_local_iso(current_leg.scheduled_arrival, destination_tz),
+            actual_arrival_local=to_local_iso(current_leg.actual_arrival, destination_tz),
         )

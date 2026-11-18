@@ -305,3 +305,9 @@ class RealityAssessment(BaseModel):
         default=None,
         description="Live transponder aircraft state vector from OpenSky",
     )
+    origin_tz: Optional[str] = Field(None, description="IANA timezone string, e.g., 'America/Los_Angeles'")
+    destination_tz: Optional[str] = Field(None, description="IANA timezone string, e.g., 'America/New_York'")
+    scheduled_departure_local: Optional[str] = Field(None, description="ISO-8601 with offset, e.g., '2026-11-07T21:15:00-08:00'")
+    actual_departure_local: Optional[str] = Field(None, description="ISO-8601 with offset, e.g., '2026-11-07T21:40:00-08:00'")
+    scheduled_arrival_local: Optional[str] = Field(None, description="ISO-8601 with offset, e.g., '2026-11-08T04:30:00-05:00'")
+    actual_arrival_local: Optional[str] = Field(None, description="ISO-8601 with offset, e.g., '2026-11-08T04:42:00-05:00'")
