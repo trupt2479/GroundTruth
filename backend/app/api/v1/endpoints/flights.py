@@ -11,7 +11,7 @@ from app.services.aerodatabox_client import (
     AeroDataBoxServiceUnavailableError,
 )
 from app.services.faa_nas_client import FaaNasClient
-from app.services.flight_aggregator import FlightAggregator
+from app.services.flight_aggregator import FlightAggregator, FlightNotFoundError
 from app.services.prediction_engine import PredictionEngine
 
 logger = logging.getLogger(__name__)
@@ -97,6 +97,12 @@ async def evaluate_flight(
         current_leg, turnaround, telemetry = await aggregator.get_flight_context(
             flight_query
         )
+    except FlightNotFoundError as exc:
+        logger.warning("Flight not found: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
     except (AeroDataBoxRateLimitError, AeroDataBoxServiceUnavailableError) as exc:
         logger.error("Upstream flight data source unavailable: %s", exc)
         raise HTTPException(
@@ -119,7 +125,10 @@ async def evaluate_flight(
     if not current_leg:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Flight {carrier}{flight_num} on {date_str} not found.",
+            detail=(
+                f"No scheduled flight found for {carrier} {flight_num} on {date_str}. "
+                "Verify the airline IATA code (e.g., WN for Southwest, DL for Delta, OO for SkyWest) and departure date."
+            ),
         )
 
     # Check FAA NAS airspace advisory for departure airport
