@@ -615,3 +615,109 @@ describe('Watchlist Features (GT-WATCH-01)', () => {
   });
 });
 
+
+
+describe('Booked Flight Telemetry & Route Disambiguation (GT-BOOK-01)', () => {
+  it('renders active cruise telemetry on hero card when booked flight is airborne', () => {
+    const mockBookedAirborne: RealityAssessment = {
+      flight_query: {
+        carrier: 'DL',
+        flight_number: '783',
+        departure_date: '2026-11-05',
+        origin: 'LAX',
+        destination: 'ATL',
+      },
+      origin_iata: 'LAX',
+      destination_iata: 'ATL',
+      scheduled_departure: '2026-11-05T13:00:00Z',
+      actual_or_estimated_departure: '2026-11-05T13:10:00Z',
+      scheduled_arrival: '2026-11-05T18:30:00Z',
+      official_airline_departure: '2026-11-05T13:00:00Z',
+      calculated_earliest_departure: '2026-11-05T13:00:00Z',
+      delay_lead_time_minutes: 0,
+      is_unavoidable_delay: false,
+      swap_evaluation: {
+        origin_is_hub: false,
+        hub_type: 'OUTSTATION',
+        swap_probability: 'LOW',
+      },
+      rebooking_directive: 'RELAX_IN_LOUNGE',
+      live_telemetry: {
+        callsign: 'DAL783',
+        baro_altitude_ft: 33100,
+        ground_speed_kts: 430,
+        on_ground: false,
+        telemetry_source: 'BOOKED_FLIGHT',
+        flight_status: 'AIRBORNE',
+      },
+    };
+
+    render(<GroundRealityCard assessment={mockBookedAirborne} />);
+
+    expect(screen.getByTestId('booked-flight-active-telemetry')).toBeInTheDocument();
+    expect(screen.getByText('DAL783')).toBeInTheDocument();
+    expect(screen.getByText('33,100 ft')).toBeInTheDocument();
+    expect(screen.getByText('430 kts')).toBeInTheDocument();
+    expect(screen.getByText(/your booked flight/i)).toBeInTheDocument();
+  });
+
+  it('isolates inbound aircraft telemetry to secondary diagnostic card and displays clear statement', () => {
+    const turnaroundWithInbound = {
+      previous_legs: [
+        {
+          flight_number: 'DL656',
+          origin_iata: 'ATL',
+          destination_iata: 'SFO',
+          scheduled_departure: '2026-11-05T08:00:00Z',
+          scheduled_arrival: '2026-11-05T10:45:00Z',
+          actual_arrival: '2026-11-05T11:00:00Z',
+          status: 'LANDED',
+        },
+      ],
+      assigned_aircraft: {
+        icao_type: 'B752',
+        tail_number: 'N596NW',
+        category: 'NARROWBODY' as const,
+      },
+      mtt_minutes: 45 as const,
+      estimated_touchdown: '2026-11-05T11:00:00Z',
+      earliest_possible_departure: '2026-11-05T11:45:00Z',
+      live_telemetry: {
+        callsign: 'DAL656',
+        baro_altitude_ft: 40000,
+        ground_speed_kts: 413.7,
+        on_ground: false,
+        telemetry_source: 'INBOUND_ROTATION' as const,
+        telemetry_phase: 'INBOUND_ROTATION' as const,
+      },
+    };
+
+    render(<InboundVisualizer turnaround={turnaroundWithInbound} />);
+
+    expect(
+      screen.getByText(/Monitoring incoming airframe to predict gate arrival and turnaround delays before official announcement/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText('N596NW')).toBeInTheDocument();
+    expect(screen.getByText('40,000 ft')).toBeInTheDocument();
+    expect(screen.getByText('DL656')).toBeInTheDocument();
+  });
+
+  it('triggers onSearch with origin and destination when route is specified', () => {
+    const onSearchMock = vi.fn();
+    render(<FlightSearch onSearch={onSearchMock} isLoading={false} />);
+
+    const carrierInput = screen.getByLabelText(/carrier/i);
+    const flightInput = screen.getByLabelText(/flight #/i);
+    const originInput = screen.getByLabelText(/departure \(optional\)/i);
+    const destInput = screen.getByLabelText(/arrival \(optional\)/i);
+    const submitBtn = screen.getByRole('button', { name: /scan turnaround/i });
+
+    fireEvent.change(carrierInput, { target: { value: 'DL' } });
+    fireEvent.change(flightInput, { target: { value: '783' } });
+    fireEvent.change(originInput, { target: { value: 'LAX' } });
+    fireEvent.change(destInput, { target: { value: 'ATL' } });
+    fireEvent.click(submitBtn);
+
+    expect(onSearchMock).toHaveBeenCalledWith('DL', '783', expect.any(String), 'LAX', 'ATL');
+  });
+});

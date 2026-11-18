@@ -14,6 +14,8 @@ export const App: React.FC = () => {
     carrier: string;
     flightNumber: string;
     date: string;
+    origin?: string;
+    destination?: string;
     scanTrigger: number;
   } | null>(null);
 
@@ -51,18 +53,32 @@ export const App: React.FC = () => {
     activeQuery?.carrier || null,
     activeQuery?.flightNumber || null,
     activeQuery?.date || null,
+    activeQuery?.origin || null,
+    activeQuery?.destination || null,
     activeQuery?.scanTrigger
   );
 
-  const handleSearch = async (carrier: string, flightNumber: string, date: string) => {
+  const handleSearch = async (
+    carrier: string,
+    flightNumber: string,
+    date: string,
+    origin?: string,
+    destination?: string
+  ) => {
     setIsLoading(true);
     setFetchError(null);
-    setActiveQuery({ carrier, flightNumber, date, scanTrigger: Date.now() });
+    setActiveQuery({ carrier, flightNumber, date, origin, destination, scanTrigger: Date.now() });
 
     try {
-      const resp = await fetch(
-        `${API_BASE_URL}/api/v1/flights/evaluate?carrier=${carrier}&flight_num=${flightNumber}&date=${date}`
-      );
+      const params = new URLSearchParams({
+        carrier,
+        flight_num: flightNumber,
+        date,
+      });
+      if (origin) params.set('origin', origin);
+      if (destination) params.set('destination', destination);
+
+      const resp = await fetch(`${API_BASE_URL}/api/v1/flights/evaluate?${params.toString()}`);
 
       const contentType = resp.headers.get('content-type') || '';
       if (!contentType.includes('application/json')) {

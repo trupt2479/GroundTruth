@@ -138,7 +138,7 @@ export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({
       {/* Flight Header */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-4">
         <div>
-          <span className="text-xs font-semibold text-blue-400 uppercase tracking-widest">Your Flight (Booked)</span>
+          <span className="text-xs font-semibold text-blue-400 uppercase tracking-widest">Your Booked Flight</span>
           <h3 className="text-2xl font-black text-white tracking-tight flex items-center gap-2 flex-wrap">
             <span>{flight_query.carrier} {flight_query.flight_number}</span>
             {origin_iata && destination_iata && (
@@ -173,6 +173,41 @@ export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({
           </div>
         )}
       </div>
+
+            {/* Active Flight Telemetry (Hero Card - Rendered strictly when booked flight itself is airborne) */}
+      {assessment.live_telemetry && !assessment.live_telemetry.on_ground && assessment.live_telemetry.baro_altitude_ft && assessment.live_telemetry.baro_altitude_ft > 0 && (
+        <div data-testid="booked-flight-active-telemetry" className="bg-blue-950/40 border border-blue-800/60 rounded-xl p-3.5 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+              <span>Active Flight Telemetry (Airborne)</span>
+            </span>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30">
+              {assessment.live_telemetry.callsign?.trim() || `${flight_query.carrier}${flight_query.flight_number}`}
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center pt-1 font-mono">
+            <div className="bg-slate-900/70 border border-slate-800 rounded-lg p-2">
+              <span className="text-[10px] text-slate-400 uppercase font-sans font-semibold block">Cruise Altitude</span>
+              <span className="text-sm font-bold text-white">
+                {assessment.live_telemetry.baro_altitude_ft.toLocaleString()} ft
+              </span>
+            </div>
+            <div className="bg-slate-900/70 border border-slate-800 rounded-lg p-2">
+              <span className="text-[10px] text-slate-400 uppercase font-sans font-semibold block">Ground Speed</span>
+              <span className="text-sm font-bold text-white">
+                {assessment.live_telemetry.ground_speed_kts ? `${assessment.live_telemetry.ground_speed_kts} kts` : 'N/A'}
+              </span>
+            </div>
+            <div className="bg-slate-900/70 border border-slate-800 rounded-lg p-2">
+              <span className="text-[10px] text-slate-400 uppercase font-sans font-semibold block">Transponder Status</span>
+              <span className="text-xs font-bold text-emerald-400 uppercase">
+                {assessment.live_telemetry.flight_status || 'Airborne'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Flight Milestones Sub-Card */}
       <div data-testid="flight-milestones-subcard" className="bg-slate-950/60 border border-slate-800 rounded-xl p-3.5 space-y-2">

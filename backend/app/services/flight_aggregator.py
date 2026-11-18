@@ -92,6 +92,10 @@ class FlightAggregator:
         Uses cache-aside pattern with Redis (TTL = 120s for aggregate).
         """
         cache_key = f"flight:{query.carrier}_{query.flight_number}_{query.departure_date}"
+        if query.origin:
+            cache_key += f"_{query.origin.upper()}"
+        if query.destination:
+            cache_key += f"_{query.destination.upper()}"
 
         # 1. Check Redis cache
         cached_data = await self.cache.get_json(cache_key)
@@ -109,6 +113,8 @@ class FlightAggregator:
             carrier=query.carrier,
             flight_num=query.flight_number,
             date=str(query.departure_date),
+            origin=query.origin,
+            destination=query.destination,
         )
 
         if not flight_raw and not self.aerodatabox.mock_mode:
@@ -222,42 +228,97 @@ class FlightAggregator:
                 date=str(query.departure_date),
             )
 
-        # 4. Live telemetry via OpenSky (Prioritize user's booked flight)
+        # 4. Live telemetry via OpenSky (Prioritize user's booked flight callsign)
         raw_callsign = flight_raw.get("callsign")
         carrier_upper = query.carrier.upper()
         icao_prefix = CARRIER_ICAO_MAP.get(carrier_upper, carrier_upper)
         active_callsign = raw_callsign or f"{icao_prefix}{query.flight_number}"
 
-        live_telemetry = None
+        booked_telemetry: Optional[Dict[str, Any]] = None
+        inbound_telemetry: Optional[Dict[str, Any]] = None
+
         if self.opensky.mock_mode:
-            telemetry_target = mode_s or active_callsign
-            live_telemetry = await self.opensky.get_aircraft_state(telemetry_target)
-            if live_telemetry:
-                live_telemetry["telemetry_phase"] = "ACTIVE_FLIGHT"
+            # Mock mode: Handle DL 783 live cruise vs prior leg demonstration
+            if query.carrier == "DL" and query.flight_number == "783":
+                booked_telemetry = {
+                    "callsign": "DAL783",
+                    "baro_altitude_ft": 33100.0,
+                    "ground_speed_kts": 430.0,
+                    "on_ground": False,
+                    "latitude": 34.5,
+                    "longitude": -111.8,
+                    "last_contact_epoch": 1792842000,
+                    "telemetry_source": "BOOKED_FLIGHT",
+                    "telemetry_phase": "ACTIVE_FLIGHT",
+                    "flight_status": "AIRBORNE",
+                }
+                current_leg.status = "AIRBORNE"
+
+                inbound_telemetry = {
+                    "callsign": "DAL656",
+                    "tail_number": tail_number or "N596NW",
+                    "baro_altitude_ft": 40000.0,
+                    "ground_speed_kts": 413.7,
+                    "on_ground": False,
+                    "latitude": 39.5,
+                    "longitude": -116.5,
+                    "last_contact_epoch": 1792842000,
+                    "telemetry_source": "INBOUND_ROTATION",
+                    "telemetry_phase": "INBOUND_ROTATION",
+                }
+            elif query.carrier == "UA" and query.flight_number == "1422":
+                mock_state = await self.opensky.get_aircraft_state(active_callsign)
+                if mock_state:
+                    mock_state["telemetry_source"] = "BOOKED_FLIGHT"
+                    mock_state["telemetry_phase"] = "ACTIVE_FLIGHT"
+                    mock_state["flight_status"] = "AIRBORNE"
+                    booked_telemetry = mock_state
+                    current_leg.status = "AIRBORNE"
+            else:
+                # Other flights (e.g. DL 450, AA 1200) not yet airborne; isolate inbound airframe
+                target_inbound = mode_s or tail_number or active_callsign
+                mock_state = await self.opensky.get_aircraft_state(target_inbound)
+                if mock_state:
+                    mock_state["telemetry_source"] = "INBOUND_ROTATION"
+                    mock_state["telemetry_phase"] = "INBOUND_ROTATION"
+                    mock_state["inbound_callsign"] = mock_state.get("callsign")
+                    inbound_telemetry = mock_state
         else:
-            # 4a. Check if the user's booked flight is currently active/airborne in OpenSky
+            # Live Ingestion: Prioritize booked flight callsign in OpenSky
             active_state = await self.opensky.get_aircraft_state(active_callsign)
             if (
                 active_state
                 and not active_state.get("on_ground")
                 and active_state.get("baro_altitude_ft") is not None
+                and (active_state.get("baro_altitude_ft") or 0) > 0
             ):
+                active_state["telemetry_source"] = "BOOKED_FLIGHT"
                 active_state["telemetry_phase"] = "ACTIVE_FLIGHT"
-                live_telemetry = active_state
-            elif mode_s:
-                # 4b. Booked flight not airborne; track inbound aircraft's rotation as background check
-                inbound_state = await self.opensky.get_aircraft_state(mode_s)
+                active_state["flight_status"] = "AIRBORNE"
+                current_leg.status = "AIRBORNE"
+                booked_telemetry = active_state
+
+            # Query inbound airframe separately as background turnaround check
+            target_inbound = mode_s or tail_number
+            if target_inbound and target_inbound.upper() not in ("PENDING", "UNAVAILABLE", "UNKNOWN"):
+                inbound_state = await self.opensky.get_aircraft_state(target_inbound)
                 if inbound_state:
+                    inbound_state["telemetry_source"] = "INBOUND_ROTATION"
                     inbound_state["telemetry_phase"] = "INBOUND_ROTATION"
                     inbound_state["inbound_callsign"] = inbound_state.get("callsign")
-                    live_telemetry = inbound_state
-            else:
-                live_telemetry = active_state or None
+                    inbound_telemetry = inbound_state
+
+        # Primary live telemetry represents the BOOKED flight only.
+        # Inbound telemetry is strictly isolated to turnaround.live_telemetry.
+        live_telemetry = booked_telemetry
 
         # Write live telemetry to Redis with 60s TTL
         if live_telemetry:
             tail_key = f"tail:{tail_number}:state"
             await self.cache.set_json(tail_key, live_telemetry, ttl_seconds=LIVE_STATE_TTL)
+        elif inbound_telemetry:
+            tail_key = f"tail:{tail_number}:state"
+            await self.cache.set_json(tail_key, inbound_telemetry, ttl_seconds=LIVE_STATE_TTL)
 
         # 5. Calculate estimated touchdown and earliest possible departure
         if previous_legs:
@@ -279,6 +340,7 @@ class FlightAggregator:
             mtt_minutes=mtt_minutes,
             estimated_touchdown=estimated_touchdown,
             earliest_possible_departure=earliest_possible_departure,
+            live_telemetry=inbound_telemetry,
         )
 
         # 6. Store aggregate in Redis with 120s TTL

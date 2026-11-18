@@ -2,6 +2,8 @@ export interface FlightQuery {
   carrier: string;
   flight_number: string;
   departure_date: string;
+  origin?: string;
+  destination?: string;
 }
 
 export interface AircraftInfo {
@@ -27,6 +29,7 @@ export interface InboundTurnaround {
   mtt_minutes: 35 | 45 | 75;
   estimated_touchdown: string;
   earliest_possible_departure: string;
+  live_telemetry?: LiveTelemetry | null;
 }
 
 export interface SwapHeuristic {
@@ -93,6 +96,8 @@ export interface LiveTelemetry {
   longitude?: number;
   last_contact_epoch?: number;
   telemetry_phase?: 'ACTIVE_FLIGHT' | 'INBOUND_ROTATION';
+  telemetry_source?: 'BOOKED_FLIGHT' | 'INBOUND_ROTATION';
+  flight_status?: string;
   inbound_callsign?: string;
 }
 

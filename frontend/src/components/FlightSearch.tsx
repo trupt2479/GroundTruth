@@ -6,6 +6,8 @@ export interface QuickScenario {
   name: string;
   carrier: string;
   flightNumber: string;
+  origin?: string;
+  destination?: string;
   description: string;
 }
 
@@ -31,10 +33,25 @@ export const QUICK_SCENARIOS: QuickScenario[] = [
     flightNumber: '1200',
     description: 'Outstation Inbound Delay Trap',
   },
+  {
+    id: 'scenario-4',
+    name: 'Live Cruise: DL 783',
+    carrier: 'DL',
+    flightNumber: '783',
+    origin: 'LAX',
+    destination: 'ATL',
+    description: 'Active Cruise Telemetry (33,100 ft) + Inbound Segregation',
+  },
 ];
 
 interface FlightSearchProps {
-  onSearch: (carrier: string, flightNumber: string, date: string) => void;
+  onSearch: (
+    carrier: string,
+    flightNumber: string,
+    date: string,
+    origin?: string,
+    destination?: string
+  ) => void;
   isLoading: boolean;
 }
 
@@ -71,6 +88,8 @@ export const FlightSearch: React.FC<FlightSearchProps> = ({ onSearch, isLoading 
   const [carrier, setCarrier] = useState('UA');
   const [flightNumber, setFlightNumber] = useState('1422');
   const [departureDate, setDepartureDate] = useState(today);
+  const [origin, setOrigin] = useState('');
+  const [destination, setDestination] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -79,6 +98,18 @@ export const FlightSearch: React.FC<FlightSearchProps> = ({ onSearch, isLoading 
     const cleanCarrier = carrier.trim().toUpperCase();
     const cleanFlightNum = flightNumber.trim();
     const cleanDate = departureDate.trim();
+    const cleanOrigin = origin.trim().toUpperCase() || undefined;
+    const cleanDestination = destination.trim().toUpperCase() || undefined;
+
+    if (cleanOrigin && !/^[A-Z]{3}$/.test(cleanOrigin)) {
+      setValidationError('Departure airport must be a 3-letter IATA code (e.g. LAX).');
+      return;
+    }
+
+    if (cleanDestination && !/^[A-Z]{3}$/.test(cleanDestination)) {
+      setValidationError('Arrival airport must be a 3-letter IATA code (e.g. ATL).');
+      return;
+    }
 
     // Client-side regex validations
     if (!/^[A-Z]{2}$/.test(cleanCarrier)) {
@@ -97,7 +128,11 @@ export const FlightSearch: React.FC<FlightSearchProps> = ({ onSearch, isLoading 
     }
 
     setValidationError(null);
-    onSearch(cleanCarrier, cleanFlightNum, cleanDate);
+    if (cleanOrigin || cleanDestination) {
+      onSearch(cleanCarrier, cleanFlightNum, cleanDate, cleanOrigin, cleanDestination);
+    } else {
+      onSearch(cleanCarrier, cleanFlightNum, cleanDate);
+    }
   };
 
   return (
@@ -215,6 +250,8 @@ export const FlightSearch: React.FC<FlightSearchProps> = ({ onSearch, isLoading 
                   onClick={() => {
                     setCarrier(s.carrier);
                     setFlightNumber(s.flightNumber);
+                    setOrigin(s.origin || '');
+                    setDestination(s.destination || '');
                     setDepartureDate(getToday());
                     setValidationError(null);
                   }}
@@ -236,6 +273,41 @@ export const FlightSearch: React.FC<FlightSearchProps> = ({ onSearch, isLoading 
                 </button>
               );
             })}
+          </div>
+        </div>
+
+        {/* Optional City Pair / Route Inputs for Multi-Leg Disambiguation */}
+        <div className="grid grid-cols-2 gap-3 pt-0.5">
+          <div>
+            <label htmlFor="origin-input" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+              Departure (Optional)
+            </label>
+            <input
+              id="origin-input"
+              type="text"
+              maxLength={3}
+              value={origin}
+              onChange={(e) => setOrigin(e.target.value.toUpperCase())}
+              placeholder="e.g. LAX"
+              className="w-full bg-slate-950 border border-slate-750 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl px-3 py-2 text-center font-mono text-sm font-bold uppercase text-slate-100 placeholder-slate-600 outline-none transition"
+              disabled={isLoading}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="dest-input" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+              Arrival (Optional)
+            </label>
+            <input
+              id="dest-input"
+              type="text"
+              maxLength={3}
+              value={destination}
+              onChange={(e) => setDestination(e.target.value.toUpperCase())}
+              placeholder="e.g. ATL"
+              className="w-full bg-slate-950 border border-slate-750 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl px-3 py-2 text-center font-mono text-sm font-bold uppercase text-slate-100 placeholder-slate-600 outline-none transition"
+              disabled={isLoading}
+            />
           </div>
         </div>
 
