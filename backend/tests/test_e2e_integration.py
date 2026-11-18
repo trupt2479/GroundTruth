@@ -46,6 +46,7 @@ def test_e2e_browser_search_to_evaluation_flow(client):
         "RELAX_IN_LOUNGE",
         "MONITOR_CLOSELY",
         "EXPEDITE_REBOOKING",
+        "EN_ROUTE_ON_TIME",
     ]
 
 

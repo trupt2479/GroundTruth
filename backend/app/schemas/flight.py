@@ -94,6 +94,18 @@ class FlightLeg(BaseModel):
     actual_arrival: datetime | None = Field(
         default=None, description="Actual or estimated touchdown/in timestamp"
     )
+    scheduled_departure_local: Optional[str] = Field(
+        default=None, description="Local scheduled departure from provider"
+    )
+    actual_departure_local: Optional[str] = Field(
+        default=None, description="Local actual departure from provider"
+    )
+    scheduled_arrival_local: Optional[str] = Field(
+        default=None, description="Local scheduled arrival from provider"
+    )
+    actual_arrival_local: Optional[str] = Field(
+        default=None, description="Local actual arrival from provider"
+    )
     status: str = Field(
         ...,
         description="Current leg status (e.g., 'SCHEDULED', 'ACTIVE', 'LANDED', 'DELAYED')",
@@ -280,7 +292,7 @@ class RealityAssessment(BaseModel):
         description="Heuristic evaluation of spare aircraft availability and swap likelihood",
     )
     rebooking_directive: Literal[
-        "RELAX_IN_LOUNGE", "MONITOR_CLOSELY", "EXPEDITE_REBOOKING"
+        "RELAX_IN_LOUNGE", "MONITOR_CLOSELY", "EXPEDITE_REBOOKING", "EN_ROUTE_ON_TIME"
     ] = Field(
         ...,
         description="Actionable travel guidance directive for traveler",

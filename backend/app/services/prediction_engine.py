@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional
 
 from app.schemas.flight import (
@@ -16,6 +16,15 @@ from app.services.crew_duty_watchdog import CrewDutyWatchdog
 from app.services.flight_scout import AlternativeFlightScout
 from app.services.swap_evaluator import SwapEvaluator
 from app.services.turnaround_engine import TurnaroundEngine
+
+
+def _ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    """Ensure datetime carries timezone.utc for safe epoch math across date rollovers."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 class PredictionEngine:
@@ -128,6 +137,14 @@ class PredictionEngine:
                     )
                     is_unavoidable_delay = True
 
+        # Rollover Epoch Math Guard: compute delay strictly from timezone-aware UTC epoch differences
+        earliest_dep_utc = _ensure_utc(calculated_earliest_departure)
+        scheduled_dep_utc = _ensure_utc(current_leg.scheduled_departure)
+        if earliest_dep_utc and scheduled_dep_utc:
+            delta_seconds = (earliest_dep_utc - scheduled_dep_utc).total_seconds()
+            delay_lead_time_minutes = max(0, int(delta_seconds // 60))
+            is_unavoidable_delay = is_unavoidable_delay or (earliest_dep_utc > scheduled_dep_utc)
+
         # 4. Inbound delay magnitude
         inbound_delay_minutes = delay_lead_time_minutes
 
@@ -165,8 +182,49 @@ class PredictionEngine:
             current_leg.actual_departure or current_leg.scheduled_departure
         )
 
+        # 9. Airborne Equipment Swap Reconciliation
+        is_booked_airborne = False
+        if live_telemetry and isinstance(live_telemetry, dict):
+            status = str(live_telemetry.get("flight_status") or "").upper()
+            source = str(live_telemetry.get("telemetry_source") or "").upper()
+            if status == "AIRBORNE" and source == "BOOKED_FLIGHT":
+                is_booked_airborne = True
+
+        if is_booked_airborne:
+            is_unavoidable_delay = False
+            rebooking_directive = "EN_ROUTE_ON_TIME"
+            calculated_earliest_departure = official_airline_departure
+            if current_leg.actual_arrival and current_leg.scheduled_arrival:
+                act_arr_utc = _ensure_utc(current_leg.actual_arrival)
+                sched_arr_utc = _ensure_utc(current_leg.scheduled_arrival)
+                if act_arr_utc and sched_arr_utc and act_arr_utc > sched_arr_utc:
+                    arr_delay = int((act_arr_utc - sched_arr_utc).total_seconds() // 60)
+                    delay_lead_time_minutes = max(0, arr_delay)
+                else:
+                    delay_lead_time_minutes = 0
+            else:
+                delay_lead_time_minutes = 0
+
+        # 10. Airport-local timezones and AeroDataBox native fallback
         origin_tz = get_airport_timezone(current_leg.origin_iata)
         destination_tz = get_airport_timezone(current_leg.destination_iata)
+
+        scheduled_departure_local = (
+            to_local_iso(current_leg.scheduled_departure, origin_tz)
+            or current_leg.scheduled_departure_local
+        )
+        actual_departure_local = (
+            to_local_iso(current_leg.actual_departure, origin_tz)
+            or current_leg.actual_departure_local
+        )
+        scheduled_arrival_local = (
+            to_local_iso(current_leg.scheduled_arrival, destination_tz)
+            or current_leg.scheduled_arrival_local
+        )
+        actual_arrival_local = (
+            to_local_iso(current_leg.actual_arrival, destination_tz)
+            or current_leg.actual_arrival_local
+        )
 
         return RealityAssessment(
             flight_query=flight_query,
@@ -191,8 +249,8 @@ class PredictionEngine:
             live_telemetry=live_telemetry,
             origin_tz=origin_tz,
             destination_tz=destination_tz,
-            scheduled_departure_local=to_local_iso(current_leg.scheduled_departure, origin_tz),
-            actual_departure_local=to_local_iso(current_leg.actual_departure, origin_tz),
-            scheduled_arrival_local=to_local_iso(current_leg.scheduled_arrival, destination_tz),
-            actual_arrival_local=to_local_iso(current_leg.actual_arrival, destination_tz),
+            scheduled_departure_local=scheduled_departure_local,
+            actual_departure_local=actual_departure_local,
+            scheduled_arrival_local=scheduled_arrival_local,
+            actual_arrival_local=actual_arrival_local,
         )
