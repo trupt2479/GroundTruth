@@ -94,6 +94,18 @@ class FlightLeg(BaseModel):
     actual_arrival: datetime | None = Field(
         default=None, description="Actual or estimated touchdown/in timestamp"
     )
+    scheduled_departure_local: Optional[str] = Field(
+        default=None, description="Local scheduled departure from provider"
+    )
+    actual_departure_local: Optional[str] = Field(
+        default=None, description="Local actual departure from provider"
+    )
+    scheduled_arrival_local: Optional[str] = Field(
+        default=None, description="Local scheduled arrival from provider"
+    )
+    actual_arrival_local: Optional[str] = Field(
+        default=None, description="Local actual arrival from provider"
+    )
     status: str = Field(
         ...,
         description="Current leg status (e.g., 'SCHEDULED', 'ACTIVE', 'LANDED', 'DELAYED')",
@@ -280,7 +292,7 @@ class RealityAssessment(BaseModel):
         description="Heuristic evaluation of spare aircraft availability and swap likelihood",
     )
     rebooking_directive: Literal[
-        "RELAX_IN_LOUNGE", "MONITOR_CLOSELY", "EXPEDITE_REBOOKING"
+        "RELAX_IN_LOUNGE", "MONITOR_CLOSELY", "EXPEDITE_REBOOKING", "EN_ROUTE_ON_TIME"
     ] = Field(
         ...,
         description="Actionable travel guidance directive for traveler",
@@ -305,3 +317,9 @@ class RealityAssessment(BaseModel):
         default=None,
         description="Live transponder aircraft state vector from OpenSky",
     )
+    origin_tz: Optional[str] = Field(None, description="IANA timezone string, e.g., 'America/Los_Angeles'")
+    destination_tz: Optional[str] = Field(None, description="IANA timezone string, e.g., 'America/New_York'")
+    scheduled_departure_local: Optional[str] = Field(None, description="ISO-8601 with offset, e.g., '2026-11-07T21:15:00-08:00'")
+    actual_departure_local: Optional[str] = Field(None, description="ISO-8601 with offset, e.g., '2026-11-07T21:40:00-08:00'")
+    scheduled_arrival_local: Optional[str] = Field(None, description="ISO-8601 with offset, e.g., '2026-11-08T04:30:00-05:00'")
+    actual_arrival_local: Optional[str] = Field(None, description="ISO-8601 with offset, e.g., '2026-11-08T04:42:00-05:00'")

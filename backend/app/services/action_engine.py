@@ -1,7 +1,7 @@
 from typing import Literal, Optional
 from app.schemas.flight import SwapHeuristic
 
-RebookingDirective = Literal["RELAX_IN_LOUNGE", "MONITOR_CLOSELY", "EXPEDITE_REBOOKING"]
+RebookingDirective = Literal["RELAX_IN_LOUNGE", "MONITOR_CLOSELY", "EXPEDITE_REBOOKING", "EN_ROUTE_ON_TIME"]
 
 
 class ActionEngine:

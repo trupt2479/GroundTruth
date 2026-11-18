@@ -721,3 +721,85 @@ describe('Booked Flight Telemetry & Route Disambiguation (GT-BOOK-01)', () => {
     expect(onSearchMock).toHaveBeenCalledWith('DL', '783', expect.any(String), 'LAX', 'ATL');
   });
 });
+
+describe('Airport-Local Timezones, Display Toggle & Rollover Guard (GT-TIME-01)', () => {
+  const mockTimezoneAssessment: RealityAssessment = {
+    flight_query: {
+      carrier: 'DL',
+      flight_number: '783',
+      departure_date: '2026-11-07',
+      origin: 'LAX',
+      destination: 'ATL',
+    },
+    origin_iata: 'LAX',
+    destination_iata: 'ATL',
+    origin_tz: 'America/Los_Angeles',
+    destination_tz: 'America/New_York',
+    scheduled_departure: '2026-11-08T05:15:00Z',
+    actual_or_estimated_departure: '2026-11-08T05:40:00Z',
+    scheduled_arrival: '2026-11-08T09:30:00Z',
+    actual_or_estimated_arrival: '2026-11-08T09:42:00Z',
+    official_airline_departure: '2026-11-08T05:15:00Z',
+    calculated_earliest_departure: '2026-11-08T05:15:00Z',
+    delay_lead_time_minutes: 0,
+    is_unavoidable_delay: false,
+    swap_evaluation: {
+      origin_is_hub: false,
+      hub_type: 'OUTSTATION',
+      swap_probability: 'LOW',
+    },
+    rebooking_directive: 'RELAX_IN_LOUNGE',
+  };
+
+  it('toggles timezone display mode between airport local and my time and persists in localStorage', () => {
+    localStorage.clear();
+    render(<GroundRealityCard assessment={mockTimezoneAssessment} />);
+
+    // Default: Airport Local
+    const airportBtn = screen.getByTestId('tz-toggle-airport');
+    const deviceBtn = screen.getByTestId('tz-toggle-device');
+
+    expect(airportBtn).toHaveClass('bg-blue-600');
+
+    // Click My Time (Device timezone)
+    fireEvent.click(deviceBtn);
+    expect(localStorage.getItem('groundtruth_timezone_mode')).toBe('device');
+    expect(deviceBtn).toHaveClass('bg-blue-600');
+
+    // Click Airport Local
+    fireEvent.click(airportBtn);
+    expect(localStorage.getItem('groundtruth_timezone_mode')).toBe('airport');
+    expect(airportBtn).toHaveClass('bg-blue-600');
+  });
+
+  it('renders +1 day badge for overnight flights when arrival crosses midnight into next day', () => {
+    localStorage.setItem('groundtruth_timezone_mode', 'airport');
+    render(<GroundRealityCard assessment={mockTimezoneAssessment} />);
+
+    // In LAX (PST), departure is 2026-11-07 21:15. In ATL (EST), arrival is 2026-11-08 04:30.
+    // That crosses date from 2026-11-07 to 2026-11-08 -> overnight +1 day badge.
+    const plusOneBadge = screen.getByTestId('plus-one-day-badge');
+    expect(plusOneBadge).toBeInTheDocument();
+    expect(plusOneBadge).toHaveTextContent('+1 day');
+  });
+
+  it('renders calm airborne banner for EN_ROUTE_ON_TIME directive', () => {
+    const airborneAssessment: RealityAssessment = {
+      ...mockTimezoneAssessment,
+      rebooking_directive: 'EN_ROUTE_ON_TIME',
+      live_telemetry: {
+        flight_status: 'AIRBORNE',
+        telemetry_source: 'BOOKED_FLIGHT',
+        baro_altitude_ft: 35000,
+        ground_speed_kts: 460,
+      },
+    };
+
+    render(<GroundRealityCard assessment={airborneAssessment} />);
+
+    expect(screen.getByText(/En Route — Flight Airborne/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Flight has departed on schedule. Turnaround conditions resolved./i)
+    ).toBeInTheDocument();
+  });
+});

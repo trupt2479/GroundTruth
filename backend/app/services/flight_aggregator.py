@@ -71,6 +71,18 @@ def _safe_get_utc(container: Optional[Dict[str, Any]], field: str) -> Optional[s
     return None
 
 
+def _safe_get_local(container: Optional[Dict[str, Any]], field: str) -> Optional[str]:
+    """Helper to safely extract a local time string from nested dictionaries."""
+    if not isinstance(container, dict):
+        return None
+    val = container.get(field)
+    if isinstance(val, dict):
+        return val.get("local")
+    if isinstance(val, str):
+        return val
+    return None
+
+
 class FlightAggregator:
     """Orchestrates flight data ingestion across AeroDataBox and OpenSky with Redis cache-aside."""
 
@@ -178,6 +190,27 @@ class FlightAggregator:
             or _safe_get_utc(arr_info, "revisedTime")
         )
 
+        sched_dep_local = (
+            _safe_get_local(dep_info, "scheduledTime")
+            or dep_info.get("scheduledTimeLocal")
+            or _safe_get_local(movement, "scheduledTime")
+        )
+        sched_arr_local = (
+            _safe_get_local(arr_info, "scheduledTime")
+            or arr_info.get("scheduledTimeLocal")
+        )
+        act_dep_local = (
+            _safe_get_local(dep_info, "actualTime")
+            or dep_info.get("actualTimeLocal")
+            or _safe_get_local(dep_info, "revisedTime")
+            or _safe_get_local(movement, "revisedTime")
+        )
+        act_arr_local = (
+            _safe_get_local(arr_info, "actualTime")
+            or arr_info.get("actualTimeLocal")
+            or _safe_get_local(arr_info, "revisedTime")
+        )
+
         sched_dep = parse_iso_datetime(sched_dep_str) or datetime.now(timezone.utc)
         sched_arr = parse_iso_datetime(sched_arr_str) or (datetime.now(timezone.utc) + timedelta(hours=2))
         act_dep = parse_iso_datetime(act_dep_str)
@@ -194,6 +227,10 @@ class FlightAggregator:
             scheduled_arrival=sched_arr,
             actual_departure=act_dep,
             actual_arrival=act_arr,
+            scheduled_departure_local=sched_dep_local,
+            actual_departure_local=act_dep_local,
+            scheduled_arrival_local=sched_arr_local,
+            actual_arrival_local=act_arr_local,
             status=status,
         )
 

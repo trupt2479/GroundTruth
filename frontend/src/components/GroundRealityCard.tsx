@@ -46,6 +46,12 @@ export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({
     airspace_advisory,
     alternative_flights,
     crew_duty,
+    origin_tz,
+    destination_tz,
+    scheduled_departure_local,
+    actual_departure_local,
+    scheduled_arrival_local,
+    actual_arrival_local,
   } = assessment;
 
   const [copiedFlight, setCopiedFlight] = useState<string | null>(null);
@@ -93,18 +99,116 @@ export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({
     setTimeout(() => setCopiedFlight(null), 2000);
   };
 
-  // Format datetimes to local display strings
-  const formatTime = (isoString: string) => {
+  const [tzMode, setTzMode] = useState<'airport' | 'device'>(() => {
     try {
-      const dt = new Date(isoString);
-      return dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+      const saved = localStorage.getItem('groundtruth_timezone_mode');
+      if (saved === 'airport' || saved === 'device') {
+        return saved;
+      }
+      return 'airport';
     } catch {
-      return isoString;
+      return 'airport';
+    }
+  });
+
+  const handleTzChange = (mode: 'airport' | 'device') => {
+    setTzMode(mode);
+    try {
+      localStorage.setItem('groundtruth_timezone_mode', mode);
+    } catch {
+      // ignore
     }
   };
 
-  const officialTimeFormatted = formatTime(official_airline_departure);
-  const calculatedTimeFormatted = formatTime(calculated_earliest_departure);
+  // Format datetimes to local display strings
+  const formatTime = (
+    isoString?: string | null,
+    targetTz?: string | null,
+    localFallback?: string | null
+  ) => {
+    if (!isoString) return '';
+    try {
+      const dt = new Date(isoString);
+      if (isNaN(dt.getTime())) {
+        return localFallback || isoString;
+      }
+      if (tzMode === 'airport' && targetTz) {
+        return new Intl.DateTimeFormat('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+          timeZone: targetTz,
+          timeZoneName: 'short',
+        }).format(dt);
+      }
+      if (tzMode === 'airport' && !targetTz && localFallback) {
+        try {
+          const fallbackDt = new Date(localFallback);
+          if (!isNaN(fallbackDt.getTime())) {
+            return fallbackDt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+          }
+        } catch {
+          // ignore
+        }
+        return localFallback;
+      }
+      return new Intl.DateTimeFormat('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+        timeZoneName: 'short',
+      }).format(dt);
+    } catch {
+      return localFallback || isoString;
+    }
+  };
+
+  const getLocalDateString = (
+    isoUtc?: string | null,
+    targetTz?: string | null,
+    localFallback?: string | null
+  ): string | null => {
+    if (!isoUtc) return null;
+    try {
+      const dt = new Date(isoUtc);
+      if (isNaN(dt.getTime())) return null;
+      if (tzMode === 'airport' && targetTz) {
+        return new Intl.DateTimeFormat('en-CA', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          timeZone: targetTz,
+        }).format(dt);
+      }
+      if (tzMode === 'airport' && !targetTz && localFallback) {
+        return localFallback.slice(0, 10);
+      }
+      return new Intl.DateTimeFormat('en-CA', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(dt);
+    } catch {
+      return null;
+    }
+  };
+
+  const departureUtcForDate = scheduled_departure || official_airline_departure;
+  const arrivalUtcForDate = scheduled_arrival || actual_or_estimated_arrival;
+  const depDateStr = getLocalDateString(departureUtcForDate, origin_tz, scheduled_departure_local);
+  const arrDateStr = getLocalDateString(arrivalUtcForDate, destination_tz, scheduled_arrival_local);
+  const isOvernight = Boolean(depDateStr && arrDateStr && arrDateStr > depDateStr);
+
+  const officialTimeFormatted = formatTime(
+    official_airline_departure,
+    origin_tz,
+    scheduled_departure_local
+  );
+  const calculatedTimeFormatted = formatTime(
+    calculated_earliest_departure,
+    origin_tz,
+    scheduled_departure_local
+  );
 
   // Directive Styling
   const directiveConfig = {
@@ -128,6 +232,13 @@ export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({
       icon: AlertTriangle,
       headline: 'Immediate Action: Expedite Rebooking',
       description: 'Unavoidable physical delay or ground stop active. Rebook seats before announcement.',
+    },
+    EN_ROUTE_ON_TIME: {
+      bg: 'bg-emerald-950/40 border-emerald-700/80 text-emerald-200',
+      badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+      icon: Plane,
+      headline: 'En Route — Flight Airborne',
+      description: 'Flight has departed on schedule. Turnaround conditions resolved.',
     },
   }[rebooking_directive];
 
@@ -211,14 +322,42 @@ export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({
 
       {/* Flight Milestones Sub-Card */}
       <div data-testid="flight-milestones-subcard" className="bg-slate-950/60 border border-slate-800 rounded-xl p-3.5 space-y-2">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
             <Clock className="w-3 h-3 text-blue-400" />
             <span>Flight Milestones</span>
           </span>
-          <span className="text-[10px] font-mono text-slate-500">
-            {origin_iata} → {destination_iata}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono text-slate-500 hidden sm:inline">
+              {origin_iata} → {destination_iata}
+            </span>
+            <div data-testid="tz-toggle-container" className="flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5 text-[10px] font-semibold">
+              <button
+                type="button"
+                data-testid="tz-toggle-airport"
+                onClick={() => handleTzChange('airport')}
+                className={`px-2 py-0.5 rounded transition ${
+                  tzMode === 'airport'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Airport Local
+              </button>
+              <button
+                type="button"
+                data-testid="tz-toggle-device"
+                onClick={() => handleTzChange('device')}
+                className={`px-2 py-0.5 rounded transition ${
+                  tzMode === 'device'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                My Time
+              </button>
+            </div>
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-3 text-xs pt-1">
           <div className="bg-slate-900/60 border border-slate-800/80 rounded-lg p-2.5 space-y-1">
@@ -226,29 +365,57 @@ export const GroundRealityCard: React.FC<GroundRealityCardProps> = ({
             <div className="font-mono text-xs flex justify-between">
               <span className="text-slate-500">Sched:</span>
               <span className="text-slate-200 font-semibold">
-                {scheduled_departure ? formatTime(scheduled_departure) : officialTimeFormatted}
+                {scheduled_departure
+                  ? formatTime(scheduled_departure, origin_tz, scheduled_departure_local)
+                  : officialTimeFormatted}
               </span>
             </div>
             <div className="font-mono text-xs flex justify-between">
               <span className="text-slate-500">Runway Out:</span>
               <span className="text-slate-200 font-semibold">
-                {actual_or_estimated_departure ? formatTime(actual_or_estimated_departure) : 'On Schedule'}
+                {actual_or_estimated_departure
+                  ? formatTime(actual_or_estimated_departure, origin_tz, actual_departure_local)
+                  : 'On Schedule'}
               </span>
             </div>
           </div>
 
           <div className="bg-slate-900/60 border border-slate-800/80 rounded-lg p-2.5 space-y-1">
             <span className="text-[10px] text-slate-400 uppercase font-semibold block">Arrival Milestones</span>
-            <div className="font-mono text-xs flex justify-between">
+            <div className="font-mono text-xs flex justify-between items-center">
               <span className="text-slate-500">Sched:</span>
-              <span className="text-slate-200 font-semibold">
-                {scheduled_arrival ? formatTime(scheduled_arrival) : 'Scheduled'}
+              <span className="text-slate-200 font-semibold flex items-center">
+                <span>
+                  {scheduled_arrival
+                    ? formatTime(scheduled_arrival, destination_tz, scheduled_arrival_local)
+                    : 'Scheduled'}
+                </span>
+                {isOvernight && (
+                  <span
+                    data-testid="plus-one-day-badge"
+                    className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold font-mono bg-blue-500/20 text-blue-300 border border-blue-500/30"
+                  >
+                    +1 day
+                  </span>
+                )}
               </span>
             </div>
-            <div className="font-mono text-xs flex justify-between">
+            <div className="font-mono text-xs flex justify-between items-center">
               <span className="text-slate-500">Touchdown:</span>
-              <span className="text-slate-200 font-semibold">
-                {actual_or_estimated_arrival ? formatTime(actual_or_estimated_arrival) : 'Estimated On-Time'}
+              <span className="text-slate-200 font-semibold flex items-center">
+                <span>
+                  {actual_or_estimated_arrival
+                    ? formatTime(actual_or_estimated_arrival, destination_tz, actual_arrival_local)
+                    : 'Estimated On-Time'}
+                </span>
+                {isOvernight && (
+                  <span
+                    data-testid="plus-one-day-badge-touchdown"
+                    className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold font-mono bg-blue-500/20 text-blue-300 border border-blue-500/30"
+                  >
+                    +1 day
+                  </span>
+                )}
               </span>
             </div>
           </div>

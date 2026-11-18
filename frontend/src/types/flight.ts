@@ -79,12 +79,18 @@ export interface RealityAssessment {
   delay_lead_time_minutes: number;
   is_unavoidable_delay: boolean;
   swap_evaluation: SwapHeuristic;
-  rebooking_directive: 'RELAX_IN_LOUNGE' | 'MONITOR_CLOSELY' | 'EXPEDITE_REBOOKING';
+  rebooking_directive: 'RELAX_IN_LOUNGE' | 'MONITOR_CLOSELY' | 'EXPEDITE_REBOOKING' | 'EN_ROUTE_ON_TIME';
   airspace_advisory?: AirspaceAdvisory | null;
   alternative_flights?: AlternativeFlight[];
   crew_duty?: CrewDutyAssessment | null;
   inbound_turnaround?: InboundTurnaround | null;
   live_telemetry?: LiveTelemetry | null;
+  origin_tz?: string | null;
+  destination_tz?: string | null;
+  scheduled_departure_local?: string | null;
+  actual_departure_local?: string | null;
+  scheduled_arrival_local?: string | null;
+  actual_arrival_local?: string | null;
 }
 
 export interface LiveTelemetry {
