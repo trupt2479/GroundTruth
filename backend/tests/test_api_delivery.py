@@ -253,3 +253,83 @@ def test_evaluate_flight_exposes_route_and_milestones(client):
     assert data["destination_name"] is not None
     assert "scheduled_departure" in data
     assert "inbound_turnaround" in data
+
+
+@pytest.mark.asyncio
+async def test_aerodatabox_live_handles_204_no_content_empty_body():
+    """GT-ERR-01: Ensure live AeroDataBox returns {} and [] on HTTP 204 No Content without JSONDecodeError."""
+    from app.services.aerodatabox_client import AeroDataBoxClient
+    client = AeroDataBoxClient(mock_mode=False, api_key="dummy_key", api_host="dummy_host")
+
+    mock_resp = AsyncMock()
+    mock_resp.status_code = 204
+    mock_resp.content = b""
+
+    with patch("httpx.AsyncClient.get", return_value=mock_resp):
+        res = await client.get_flight_status("WA", "4772", "2026-11-17")
+        assert res == {}
+
+        rotations = await client.get_inbound_rotations("N123WA", "2026-11-17")
+        assert rotations == []
+
+
+def test_evaluate_flight_handles_204_and_returns_clean_404(client):
+    """GT-ERR-01: REST endpoint returns clean HTTP 404 with guidance when AeroDataBox returns 204 / flight not found."""
+    with patch(
+        "app.services.aerodatabox_client.AeroDataBoxClient.get_flight_status",
+        AsyncMock(return_value={}),
+    ):
+        response = client.get(
+            "/api/v1/flights/evaluate",
+            params={
+                "carrier": "WA",
+                "flight_num": "4772",
+                "date": "2026-11-17",
+            },
+        )
+        assert response.status_code == 404
+        data = response.json()
+        assert data["error_code"] == "HTTP_404"
+        assert "No scheduled flight found for WA 4772 on 2026-11-17" in data["detail"]
+        assert "Verify the airline IATA code" in data["detail"]
+
+
+@pytest.mark.asyncio
+async def test_sse_stream_handles_204_and_emits_error_event():
+    """GT-ERR-01: SSE stream emits clean error event containing flight-not-found detail on empty flight data."""
+    from unittest.mock import MagicMock
+    from app.api.v1.endpoints.stream import flight_event_generator
+    from app.schemas.flight import FlightQuery
+    from app.services.flight_aggregator import FlightAggregator
+    from app.services.prediction_engine import PredictionEngine
+
+    query = FlightQuery(
+        carrier="WA",
+        flight_number="4772",
+        departure_date=date(2026, 11, 17),
+    )
+    aggregator = FlightAggregator()
+    engine = PredictionEngine()
+
+    mock_request = MagicMock()
+    mock_request.is_disconnected = AsyncMock(return_value=False)
+
+    with patch(
+        "app.services.aerodatabox_client.AeroDataBoxClient.get_flight_status",
+        AsyncMock(return_value={}),
+    ):
+        events = []
+        async for event in flight_event_generator(
+            flight_query=query,
+            aggregator=aggregator,
+            engine=engine,
+            request=mock_request,
+            poll_interval=0.01,
+        ):
+            events.append(event)
+            break
+
+        assert len(events) == 1
+        assert "event: error" in events[0]
+        assert "No scheduled flight found for WA 4772 on 2026-11-17" in events[0]
+        assert "Verify the airline IATA code" in events[0]

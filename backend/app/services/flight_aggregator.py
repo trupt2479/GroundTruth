@@ -83,6 +83,11 @@ def _safe_get_local(container: Optional[Dict[str, Any]], field: str) -> Optional
     return None
 
 
+class FlightNotFoundError(Exception):
+    """Raised when no flight data is found for the specified carrier, flight number, and date."""
+    pass
+
+
 class FlightAggregator:
     """Orchestrates flight data ingestion across AeroDataBox and OpenSky with Redis cache-aside."""
 
@@ -129,9 +134,12 @@ class FlightAggregator:
             destination=query.destination,
         )
 
-        if not flight_raw and not self.aerodatabox.mock_mode:
-            logger.warning("Flight %s%s on %s returned empty data in live mode", query.carrier, query.flight_number, query.departure_date)
-            return None, None, None
+        if not flight_raw:
+            logger.warning("No flight data found for %s%s on %s", query.carrier, query.flight_number, query.departure_date)
+            raise FlightNotFoundError(
+                f"No scheduled flight found for {query.carrier} {query.flight_number} on {query.departure_date}. "
+                "Verify the airline IATA code (e.g., WN for Southwest, DL for Delta, OO for SkyWest) and departure date."
+            )
 
         dep_info = flight_raw.get("departure") or {}
         arr_info = flight_raw.get("arrival") or {}
@@ -391,3 +399,27 @@ class FlightAggregator:
         )
 
         return current_leg, inbound_turnaround, live_telemetry
+
+    async def assess_flight_async(
+        self,
+        query: FlightQuery,
+        engine: Optional[Any] = None,
+        airspace_advisory: Optional[Any] = None,
+    ) -> Any:
+        """Assesses flight context and evaluates reality assessment asynchronously."""
+        from app.services.prediction_engine import PredictionEngine
+
+        current_leg, turnaround, telemetry = await self.get_flight_context(query)
+        if not current_leg or not turnaround:
+            raise FlightNotFoundError(
+                f"No scheduled flight found for {query.carrier} {query.flight_number} on {query.departure_date}. "
+                "Verify the airline IATA code (e.g., WN for Southwest, DL for Delta, OO for SkyWest) and departure date."
+            )
+        pred_engine = engine or PredictionEngine()
+        return await pred_engine.assess_flight_async(
+            current_leg=current_leg,
+            turnaround=turnaround,
+            flight_query=query,
+            airspace_advisory=airspace_advisory,
+            live_telemetry=telemetry,
+        )

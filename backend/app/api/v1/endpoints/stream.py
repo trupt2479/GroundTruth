@@ -8,7 +8,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 
 from app.schemas.flight import FlightQuery
-from app.services.flight_aggregator import FlightAggregator
+from app.services.flight_aggregator import FlightAggregator, FlightNotFoundError
 from app.services.prediction_engine import PredictionEngine
 
 logger = logging.getLogger(__name__)
@@ -47,6 +47,11 @@ async def flight_event_generator(
         current_leg, turnaround, telemetry = await aggregator.get_flight_context(
             flight_query
         )
+        if not current_leg or not turnaround:
+            raise FlightNotFoundError(
+                f"No scheduled flight found for {flight_query.carrier} {flight_query.flight_number} on {flight_query.departure_date}. "
+                "Verify the airline IATA code (e.g., WN for Southwest, DL for Delta, OO for SkyWest) and departure date."
+            )
         assessment = engine.assess_flight(
             current_leg=current_leg,
             turnaround=turnaround,
@@ -104,12 +109,15 @@ async def flight_event_generator(
                 logger.warning("Error fetching stream update for %s: %s", flight_query, exc)
                 yield f": update-error: {exc}\n\n"
 
+    except FlightNotFoundError as exc:
+        logger.warning("Flight not found in SSE stream: %s", exc)
+        yield f"event: error\ndata: {json.dumps({'error': str(exc), 'detail': str(exc)})}\n\n"
     except asyncio.CancelledError:
         logger.info("SSE flight stream task cancelled for %s", flight_query)
         raise
     except Exception as exc:
         logger.error("SSE stream encountered fatal error: %s", exc)
-        yield f"event: ERROR\ndata: {json.dumps({'error': str(exc)})}\n\n"
+        yield f"event: error\ndata: {json.dumps({'error': str(exc), 'detail': str(exc)})}\n\n"
 
 
 @router.get(
